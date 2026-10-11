@@ -1,5 +1,5 @@
 import type { EnergyCardConfig, RoomConfig, SourceType } from "./config";
-import type { ThresholdConfig } from "./thresholds";
+import { isIdle, type ThresholdConfig } from "./thresholds";
 
 export interface Reading {
   watts: number;
@@ -15,6 +15,11 @@ export interface ConsumerNode {
   /** own thresholds from the config, replace the level thresholds */
   thresholds?: ThresholdConfig[];
 }
+/** Consumers the list shows: with `onlyActive` the ones at rest (under 1 W) are left out, unreadable sensors stay as warnings. */
+export function listedConsumers(consumers: ConsumerNode[], onlyActive: boolean): ConsumerNode[] {
+  return onlyActive ? consumers.filter((c) => !c.valid || !isIdle(c.watts)) : consumers;
+}
+
 export interface RoomNode {
   /** area_id from the config; stable across renames */
   id: string;

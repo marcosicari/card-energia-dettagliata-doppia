@@ -92,6 +92,8 @@ options:
   decimals: 2
   animation: true
   show_unassigned: true
+  show_consumers: true        # false: Verbraucher-Liste ausblenden
+  only_active_consumers: false # true: nur Verbraucher ab 1 W listen
   remember_selection: true
 ```
 

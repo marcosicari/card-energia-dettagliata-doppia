@@ -90,6 +90,40 @@ test("wrapping rooms is skipped when a single row has enough room", async ({ pag
   expect(tops).toHaveLength(1);
 });
 
+test.describe("consumer list options", () => {
+  const configure = (page: Page, options: object) =>
+    page.evaluate((o) => {
+      const el = document.querySelector("detailed-energy-card") as unknown as { _config: { options?: object }; setConfig(c: object): void };
+      el.setConfig({ ...el._config, options: { ...el._config.options, ...o } });
+    }, options);
+
+  test("the list can be hidden", async ({ page }) => {
+    await open(page, "floors");
+    await expect(page.locator("detailed-energy-card .detail")).toBeVisible();
+    await configure(page, { show_consumers: false });
+    await expect(page.locator("detailed-energy-card .detail")).toHaveCount(0);
+    // the diagram is still there
+    await expect(node(page, "Küche")).toBeVisible();
+  });
+
+  test("only active consumers can be listed", async ({ page }) => {
+    await open(page, "floors");
+    await expect(page.locator("detailed-energy-card .detail .row.idle")).not.toHaveCount(0);
+    await expect(page.locator("detailed-energy-card .detail-head")).toContainText("6 Verbraucher");
+    await configure(page, { only_active_consumers: true });
+    await expect(page.locator("detailed-energy-card .detail .row.idle")).toHaveCount(0);
+    await expect(page.locator("detailed-energy-card .detail-head")).toContainText("4 / 6 Verbraucher");
+    await expect(page.locator("detailed-energy-card .detail .row")).toContainText(["Backofen"]);
+  });
+
+  test("a room with nothing active says so", async ({ page }) => {
+    await open(page, "floors");
+    await configure(page, { only_active_consumers: true });
+    await node(page, "Flur").click();
+    await expect(page.locator("detailed-energy-card .detail .empty")).toHaveText("Keine aktiven Verbraucher");
+  });
+});
+
 test.describe("focus_selected", () => {
   const home = (page: Page) => page.locator("detailed-energy-card button.node:has(.circle.home)");
   const left = async (page: Page, title: string) => Math.round(await node(page, title).evaluate((el) => el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2));

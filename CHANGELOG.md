@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `options.show_consumers` (default on): set it to `false` to hide the list of consumers under the diagram.
+- `options.only_active_consumers` (default off): list only consumers that draw power (1 W or more). The header shows how many of the room's consumers are listed ("4 / 6"), a room with nothing active says so. Sensors that cannot be read stay listed as warnings.
+- Editor: switches for both under *General* (the second one and "Unassigned" are hidden while the list is hidden).
+
 ## 0.10.0
 
 ### Added

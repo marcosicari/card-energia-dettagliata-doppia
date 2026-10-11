@@ -148,6 +148,7 @@ describe("layout", () => {
 });
 
 import { roomPositions, MAX_ROOMS_PER_ROW, ROOM_FIT_W } from "../src/view/layout";
+import { listedConsumers, type ConsumerNode } from "../src/model/compute";
 
 describe("wrapped rooms", () => {
   it("keeps one row up to the limit and when wrapping is off", () => {
@@ -230,5 +231,19 @@ describe("floors without a visible room row", () => {
     const noRooms = computeLayout({ width: 400, sources: 3, floors: 3, rooms: 0 });
     expect(noRooms.yFloor - noRooms.yHome).toBeLessThan(withRooms.yFloor - withRooms.yHome);
     expect(noRooms.height).toBeGreaterThanOrEqual(noRooms.yFloor + FLOOR_H);
+  });
+});
+
+describe("listedConsumers", () => {
+  const c = (entity: string, watts: number, valid = true): ConsumerNode => ({ entity, watts, valid });
+  const all = [c("a", 800), c("b", 0.4), c("c", 1), c("d", 0), c("e", 0, false)];
+  it("lists everything by default", () => {
+    expect(listedConsumers(all, false)).toEqual(all);
+  });
+  it("leaves out the consumers at rest, but keeps the unreadable ones as warnings", () => {
+    expect(listedConsumers(all, true).map((x) => x.entity)).toEqual(["a", "c", "e"]);
+  });
+  it("gives an empty list when nothing is active", () => {
+    expect(listedConsumers([c("x", 0)], true)).toEqual([]);
   });
 });

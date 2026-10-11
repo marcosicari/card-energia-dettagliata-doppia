@@ -3,7 +3,7 @@ import { state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 import { cardStyles, colorVars } from "./styles/theme";
 import { collectEntityIds, validateConfig, type EnergyCardConfig } from "./model/config";
-import { computeModel, type EnergyModel, type RoomNode, type SourceNode } from "./model/compute";
+import { computeModel, listedConsumers, type EnergyModel, type RoomNode, type SourceNode } from "./model/compute";
 import { formatPower, type StateLike } from "./model/units";
 import { powerReader, socReader } from "./model/readers";
 import { elementThresholds, isIdle, resolveThresholds, thresholdColor, thresholdLevel, thresholdWidth, type ThresholdConfig, type ThresholdLevel } from "./model/thresholds";
@@ -356,7 +356,7 @@ export class DetailedEnergyCard extends LitElement {
             ${roomViews.map((v) => this._renderRoom(v.room, v.p, layout.roomColW, !v.leaving && v.room.id === sel.rooms[sel.room ?? -1]?.id, allRooms, v.leaving))}
           </div>
         </div>
-        ${this._renderDetail(model, detailRoom)}
+        ${this._config?.options?.show_consumers === false ? nothing : this._renderDetail(model, detailRoom)}
       </ha-card>
     `;
   }
@@ -486,7 +486,8 @@ export class DetailedEnergyCard extends LitElement {
     if (!room) {
       return html`<div class="detail empty">${this._t("no_rooms")}</div>`;
     }
-    const sorted = [...room.consumers].sort((a, b) => b.watts - a.watts);
+    const onlyActive = this._config?.options?.only_active_consumers === true;
+    const sorted = [...listedConsumers(room.consumers, onlyActive)].sort((a, b) => b.watts - a.watts);
     const max = Math.max(1, ...sorted.map((c) => c.watts));
     const showUnassigned = this._config?.options?.show_unassigned !== false && model.unassigned >= 1;
     const thresholds = this._thresholds;
@@ -495,9 +496,9 @@ export class DetailedEnergyCard extends LitElement {
         <div class="detail-head">
           <span><ha-icon icon=${room.icon ?? "mdi:door"}></ha-icon> <b>${room.name}</b>
             <span class="muted"> · ${this._fmt(room.watts)}</span></span>
-          <span class="muted">${room.consumers.length} ${this._t("consumers")}</span>
+          <span class="muted">${onlyActive ? `${sorted.length} / ${room.consumers.length}` : room.consumers.length} ${this._t("consumers")}</span>
         </div>
-        ${sorted.length === 0 ? html`<div class="empty">${this._t("no_consumers")}</div>` : nothing}
+        ${sorted.length === 0 ? html`<div class="empty">${this._t(room.consumers.length === 0 ? "no_consumers" : "no_active_consumers")}</div>` : nothing}
         <div class="list">
         ${sorted.map((c) => {
           const name = c.name ?? this._hass?.states[c.entity]?.attributes.friendly_name ?? c.entity;

@@ -65,6 +65,10 @@ export interface OptionsConfig {
   decimals?: number;
   animation?: boolean;
   show_unassigned?: boolean;
+  /** show the list of consumers under the diagram (default true) */
+  show_consumers?: boolean;
+  /** list only consumers that draw power (1 W or more); sensors that cannot be read stay listed as warnings */
+  only_active_consumers?: boolean;
   remember_selection?: boolean;
   wrap_rooms?: boolean;
   /** the selected floor / room slides to the middle under its parent, the others of its level fade out */
@@ -140,7 +144,7 @@ function checkOptions(options: unknown): void {
   if (d !== undefined && (typeof d !== "number" || !Number.isInteger(d) || d < 0 || d > MAX_DECIMALS)) {
     throw new ConfigError(`options.decimals must be a whole number from 0 to ${MAX_DECIMALS}`);
   }
-  for (const key of ["animation", "show_unassigned", "remember_selection", "wrap_rooms", "focus_selected"]) {
+  for (const key of ["animation", "show_unassigned", "show_consumers", "only_active_consumers", "remember_selection", "wrap_rooms", "focus_selected"]) {
     checkBool(options[key], `options.${key}`);
   }
 }

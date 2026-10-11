@@ -20,6 +20,8 @@ const EN: Record<string, string> = {
   Animation: "Animation",
   "„Nicht erfasst“ anzeigen": "Show \"Unassigned\"",
   "Auswahl merken": "Remember selection",
+  "Verbraucher-Liste anzeigen": "Show the list of consumers",
+  "Nur aktive Verbraucher anzeigen (ab 1 W)": "Show only active consumers (1 W or more)",
   "Viele Räume in zwei Reihen umbrechen (statt scrollen)": "Wrap many rooms into two rows (instead of scrolling)",
   "Gewählte Etage oder gewählten Raum in die Mitte schieben (die anderen blenden aus)":
     "Move the selected floor or room to the middle (the others fade out)",
