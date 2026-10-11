@@ -6,7 +6,7 @@ import { collectEntityIds, validateConfig, type EnergyCardConfig } from "./model
 import { computeModel, type EnergyModel, type RoomNode, type SourceNode } from "./model/compute";
 import { formatPower, type StateLike } from "./model/units";
 import { powerReader, socReader } from "./model/readers";
-import { isIdle, sortThresholds, thresholdColor, thresholdLevel, type ThresholdConfig } from "./model/thresholds";
+import { isIdle, resolveThresholds, thresholdColor, thresholdLevel, thresholdWidth, type ThresholdLevel } from "./model/thresholds";
 import { localize, sourceNames, type Key } from "./localize";
 import { buildStubConfig, type StubHass } from "./model/stub-config";
 import "./editor/card-editor";
@@ -79,7 +79,7 @@ export class DetailedEnergyCard extends LitElement {
       this._config = validateConfig(config);
       this._error = undefined;
       this._entityIds = collectEntityIds(this._config);
-      this._thresholds = sortThresholds(this._config.colors?.thresholds);
+      this._thresholds = resolveThresholds(this._config.colors?.thresholds, this._config.colors?.level_thresholds);
       this._resolved = undefined;
       this._sel = this._loadSelection();
     } catch (e) {
@@ -213,7 +213,7 @@ export class DetailedEnergyCard extends LitElement {
     return formatPower(watts, o?.unit ?? "W", o?.decimals ?? 2, this._hass?.locale?.language ?? this._hass?.language);
   }
 
-  private _thresholds: ThresholdConfig[] = [];
+  private _thresholds = resolveThresholds(undefined, undefined);
 
   private _moreInfo(entityId: string): void {
     this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }));
@@ -289,27 +289,31 @@ export class DetailedEnergyCard extends LitElement {
   private _renderLines(model: EnergyModel, l: Layout, floorIdx?: number, roomIdx?: number, allRooms = false, allFloors = false): TemplateResult {
     const animate = this._config?.options?.animation !== false;
     const thresholds = this._thresholds;
-    const line = (d: string, watts: number, active: boolean, reverse = false) => {
+    // a line belongs to the level of the node it leads to
+    const line = (lvl: ThresholdLevel, d: string, watts: number, active: boolean, reverse = false) => {
       const dur = flowDuration(watts);
       // only lines of the selected path take the threshold color, the others stay muted
-      const color = active && !isIdle(watts) ? thresholdColor(thresholds, watts) : undefined;
-      const level = color ? Math.min(thresholdLevel(thresholds, watts), MAX_LEVEL) : 0;
+      const own = thresholds[lvl];
+      const color = active && !isIdle(watts) ? thresholdColor(own, watts) : undefined;
+      const level = color ? Math.min(thresholdLevel(own, watts), MAX_LEVEL) : 0;
+      // a width set on the reached range replaces the width that follows the power
+      const width = (color ? thresholdWidth(own, watts) : undefined) ?? strokeWidth(watts) + level * 0.75;
       return svg`<path
         class="line ${active ? "active" : ""} ${dur && animate ? "flowing" : ""} ${reverse ? "reverse" : ""}"
         d=${d}
-        stroke-width=${strokeWidth(watts) + level * 0.75}
+        stroke-width=${width}
         style=${(dur ? `--dur:${dur}s;` : "") + (color ? `stroke:${color}` : "")}
       />`;
     };
     const parts: TemplateResult[] = [];
     model.sources.forEach((s, i) => {
-      parts.push(line(curve(l.sourceXs[i], SOURCE_H, l.homeX, l.yHome), s.watts, Math.abs(s.watts) >= 1, s.reverse));
+      parts.push(line("source", curve(l.sourceXs[i], SOURCE_H, l.homeX, l.yHome), s.watts, Math.abs(s.watts) >= 1, s.reverse));
     });
     const homeBottom = l.yHome + HOME_H;
     let roomFromX = l.homeX;
     let roomFromY = homeBottom;
     model.floors.forEach((f, i) => {
-      parts.push(line(curve(l.homeX, homeBottom, l.floorXs[i], l.yFloor), f.watts, allFloors || i === floorIdx));
+      parts.push(line("floor", curve(l.homeX, homeBottom, l.floorXs[i], l.yFloor), f.watts, allFloors || i === floorIdx));
       if (i === floorIdx) {
         roomFromX = l.floorXs[i];
         roomFromY = l.yFloor + FLOOR_H;
@@ -317,7 +321,7 @@ export class DetailedEnergyCard extends LitElement {
     });
     const rooms = floorIdx !== undefined ? model.floors[floorIdx].rooms : model.rooms;
     rooms.forEach((r, i) => {
-      parts.push(line(roomPath(roomFromX, roomFromY, l.roomXs[i], l.roomYs[i], l.yRoom), r.watts, allRooms || i === roomIdx));
+      parts.push(line("room", roomPath(roomFromX, roomFromY, l.roomXs[i], l.roomYs[i], l.yRoom), r.watts, allRooms || i === roomIdx));
     });
     return html`<svg class="lines" width=${l.width} height=${l.height}>${parts}</svg>`;
   }
@@ -416,12 +420,14 @@ export class DetailedEnergyCard extends LitElement {
         <div class="list">
         ${sorted.map((c) => {
           const name = c.name ?? this._hass?.states[c.entity]?.attributes.friendly_name ?? c.entity;
-          const barColor = thresholdColor(thresholds, c.watts);
-          const level = barColor ? Math.min(thresholdLevel(thresholds, c.watts), MAX_LEVEL) : 0;
+          const own = thresholds.consumer;
+          const barColor = thresholdColor(own, c.watts);
+          const level = barColor ? Math.min(thresholdLevel(own, c.watts), MAX_LEVEL) : 0;
+          const barWidth = barColor ? thresholdWidth(own, c.watts) : undefined;
           return html`
             <button class="row ${c.valid ? "" : "warn"} ${c.valid && isIdle(c.watts) ? "idle" : ""}" @click=${() => this._moreInfo(c.entity)}>
               <span class="name">${name}<small>${c.entity}</small></span>
-              <span class="bar" style=${styleMap({ "--level": String(level) })}><div style=${styleMap({ width: `${(c.watts / max) * 100}%`, background: barColor })}></div></span>
+              <span class="bar" style=${styleMap({ "--level": String(level), ...(barWidth !== undefined ? { "--bar-h": `${barWidth}px` } : {}) })}><div style=${styleMap({ width: `${(c.watts / max) * 100}%`, background: barColor })}></div></span>
               <span class="val">${c.valid ? this._fmt(c.watts) : "–"}</span>
             </button>
           `;

@@ -1,3 +1,5 @@
+import { THRESHOLD_LEVELS } from "../model/thresholds";
+
 /**
  * Declarative description of every editor field. Each field maps 1:1 to a config path,
  * so the form data is simply { [path]: value } and no per-field mapping code is needed.
@@ -75,6 +77,11 @@ export const COLORS: Field[] = [
 export const THRESHOLD: Field[] = [
   { path: "from", selector: { number: { min: 0, mode: "box", unit_of_measurement: "W" } }, label: "ab (W)", required: true },
   color("color", "Farbe"),
+  {
+    path: "width",
+    selector: { number: { min: 0.5, max: 12, step: 0.5, mode: "box", unit_of_measurement: "px" } },
+    label: "Strichstärke (px, leer = automatisch)",
+  },
 ];
 
 export const HOME: Field[] = [
@@ -152,6 +159,7 @@ export function coveredPaths(): string[] {
     ...prefix("", COLORS),
     ...prefix("", HOME),
     ...prefix("colors.thresholds[].", THRESHOLD),
+    ...THRESHOLD_LEVELS.flatMap((l) => prefix(`colors.level_thresholds.${l}[].`, THRESHOLD)),
     ...prefix("sources[].", SOURCE),
     ...prefix("floors[].", floorFields()),
     ...prefix("floors[].rooms[].", roomFields()),

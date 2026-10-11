@@ -35,7 +35,13 @@ const FULL: EnergyCardConfig = {
     bar: "#444",
     background: "#555",
     text: "#666",
-    thresholds: [{ from: 500, color: "#ff9800" }],
+    thresholds: [{ from: 500, color: "#ff9800", width: 3 }],
+    level_thresholds: {
+      source: [{ from: 2000, color: "#ff9800", width: 4 }],
+      floor: [{ from: 1500, color: "#ff9800", width: 4 }],
+      room: [{ from: 800, color: "#ff9800", width: 3 }],
+      consumer: [{ from: 300, color: "#ff9800", width: 3 }],
+    },
   },
   options: { unit: "auto", decimals: 2, animation: true, show_unassigned: true, remember_selection: true, wrap_rooms: false },
 };

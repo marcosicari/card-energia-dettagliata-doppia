@@ -7,6 +7,10 @@ import {
   isIdle,
   sortThresholds,
   thresholdColor,
+  thresholdWidth,
+  resolveThresholds,
+  DEFAULT_LEVEL_THRESHOLDS,
+  THRESHOLD_LEVELS,
 } from "../src/model/thresholds";
 
 const T = sortThresholds(DEFAULT_THRESHOLDS); // 0 green, 500 orange, 2000 red
@@ -86,5 +90,65 @@ describe("thresholdLevel", () => {
   it("is 0 below the first range and without thresholds", () => {
     expect(thresholdLevel(sortThresholds([{ from: 100, color: "red" }]), 50)).toBe(0);
     expect(thresholdLevel([], 5000)).toBe(0);
+  });
+});
+
+describe("thresholdWidth", () => {
+  const W = sortThresholds([
+    { from: 0, color: "#4caf50", width: 1.5 },
+    { from: 500, color: "#ff9800" },
+    { from: 2000, color: "#f44336", width: 5 },
+  ]);
+  it("returns the width of the highest reached range that sets one", () => {
+    expect(thresholdWidth(W, 100)).toBe(1.5);
+    expect(thresholdWidth(W, 1000)).toBe(1.5); // the 500 W range sets none: the lower one stays
+    expect(thresholdWidth(W, 2000)).toBe(5);
+    expect(thresholdWidth(W, -2500)).toBe(5);
+  });
+  it("is undefined without a width or below the first range", () => {
+    expect(thresholdWidth(T, 3000)).toBeUndefined();
+    expect(thresholdWidth(sortThresholds([{ from: 100, color: "#fff", width: 3 }]), 50)).toBeUndefined();
+  });
+});
+
+describe("resolveThresholds", () => {
+  const shared = [{ from: 0, color: "#111" }];
+  const room = [{ from: 800, color: "#222" }];
+  it("uses the own list of a level and falls back to the shared one", () => {
+    const r = resolveThresholds(shared, { room });
+    expect(r.room).toEqual(room);
+    expect(r.floor).toEqual(shared);
+    expect(r.source).toEqual(shared);
+    expect(r.consumer).toEqual(shared);
+  });
+  it("gives empty lists without any configuration", () => {
+    const r = resolveThresholds(undefined, undefined);
+    for (const l of THRESHOLD_LEVELS) expect(r[l]).toEqual([]);
+  });
+  it("has different default limits per level, rising towards the top", () => {
+    const top = (l: (typeof THRESHOLD_LEVELS)[number]) => Math.max(...DEFAULT_LEVEL_THRESHOLDS[l].map((t) => t.from));
+    expect(top("source")).toBeGreaterThan(top("floor"));
+    expect(top("floor")).toBeGreaterThan(top("room"));
+    expect(top("room")).toBeGreaterThan(top("consumer"));
+  });
+});
+
+describe("per-level threshold configuration", () => {
+  const cfg = (colors: unknown) => ({ type: "x", colors });
+  it("accepts width and level lists", () => {
+    expect(() =>
+      validateConfig(cfg({ thresholds: [{ from: 0, color: "#fff", width: 2 }], level_thresholds: { room: [{ from: 800, color: "red", width: 12 }] } })),
+    ).not.toThrow();
+  });
+  it("rejects a bad width", () => {
+    for (const width of [0.4, 13, "3", NaN]) {
+      expect(() => validateConfig(cfg({ thresholds: [{ from: 0, color: "#fff", width }] }))).toThrow(/thresholds\[0\]\.width/);
+    }
+  });
+  it("rejects unknown levels and bad shapes with the path", () => {
+    expect(() => validateConfig(cfg({ level_thresholds: { garage: [] } }))).toThrow(/level_thresholds\.garage/);
+    expect(() => validateConfig(cfg({ level_thresholds: "x" }))).toThrow(/level_thresholds must be a mapping/);
+    expect(() => validateConfig(cfg({ level_thresholds: { room: [{ from: -1, color: "#fff" }] } }))).toThrow(/level_thresholds\.room\[0\]\.from/);
+    expect(() => validateConfig(cfg({ level_thresholds: { floor: [{ from: 0, color: "#fff" }, { from: 5 }] } }))).toThrow(/level_thresholds\.floor\[1\]\.color/);
   });
 });

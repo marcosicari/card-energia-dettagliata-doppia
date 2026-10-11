@@ -1,4 +1,4 @@
-import type { ThresholdConfig } from "./thresholds";
+import { MAX_THRESHOLD_WIDTH, MIN_THRESHOLD_WIDTH, THRESHOLD_LEVELS, type LevelThresholds, type ThresholdConfig } from "./thresholds";
 import { isValidColor } from "./colors";
 
 export type SourceType = "solar" | "battery" | "grid" | "generic";
@@ -48,6 +48,8 @@ export interface ColorsConfig {
   text?: string;
   /** color of lines and bars by power range, in watts */
   thresholds?: ThresholdConfig[];
+  /** own thresholds per level (source, floor, room, consumer); unset levels use `thresholds` */
+  level_thresholds?: LevelThresholds;
 }
 
 export interface OptionsConfig {
@@ -138,12 +140,29 @@ function checkColors(colors: unknown): void {
     throw new ConfigError(`colors.preset: "${String(colors.preset)}" must be one of ${PRESETS.join(", ")}`);
   }
   for (const key of COLOR_KEYS) checkColor(colors[key], `colors.${key}`);
-  list(colors.thresholds, "colors.thresholds").forEach((t, i) => {
-    if (!isObj(t) || typeof t.from !== "number" || !Number.isFinite(t.from) || t.from < 0) {
-      throw new ConfigError(`colors.thresholds[${i}].from must be a number of watts (0 or more)`);
+  checkThresholds(colors.thresholds, "colors.thresholds");
+  const perLevel = colors.level_thresholds;
+  if (perLevel === undefined || perLevel === null) return;
+  if (!isObj(perLevel)) throw new ConfigError("colors.level_thresholds must be a mapping");
+  for (const [level, value] of Object.entries(perLevel)) {
+    if (!(THRESHOLD_LEVELS as readonly string[]).includes(level)) {
+      throw new ConfigError(`colors.level_thresholds.${level}: level must be one of ${THRESHOLD_LEVELS.join(", ")}`);
     }
-    if (typeof t.color !== "string" || !t.color) throw new ConfigError(`colors.thresholds[${i}].color is required`);
-    checkColor(t.color, `colors.thresholds[${i}].color`);
+    checkThresholds(value, `colors.level_thresholds.${level}`);
+  }
+}
+
+function checkThresholds(value: unknown, path: string): void {
+  list(value, path).forEach((t, i) => {
+    if (!isObj(t) || typeof t.from !== "number" || !Number.isFinite(t.from) || t.from < 0) {
+      throw new ConfigError(`${path}[${i}].from must be a number of watts (0 or more)`);
+    }
+    if (typeof t.color !== "string" || !t.color) throw new ConfigError(`${path}[${i}].color is required`);
+    checkColor(t.color, `${path}[${i}].color`);
+    const w = t.width;
+    if (w !== undefined && (typeof w !== "number" || !Number.isFinite(w) || w < MIN_THRESHOLD_WIDTH || w > MAX_THRESHOLD_WIDTH)) {
+      throw new ConfigError(`${path}[${i}].width must be a number from ${MIN_THRESHOLD_WIDTH} to ${MAX_THRESHOLD_WIDTH} (pixels)`);
+    }
   });
 }
 

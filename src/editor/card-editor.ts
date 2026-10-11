@@ -33,7 +33,14 @@ import {
 } from "./schema";
 import { RegistrySource, type Registries, type RegistryHass } from "../model/registry";
 import type { StateLike } from "../model/units";
-import { DEFAULT_THRESHOLDS, duplicateThresholds, type ThresholdConfig } from "../model/thresholds";
+import {
+  DEFAULT_LEVEL_THRESHOLDS,
+  DEFAULT_THRESHOLDS,
+  THRESHOLD_LEVELS,
+  duplicateThresholds,
+  type ThresholdConfig,
+  type ThresholdLevel,
+} from "../model/thresholds";
 import { colorError, contrastWarning, fieldErrors, sumConflict } from "./validation";
 import { defineOnce } from "../register";
 import { hassChangedForEditor, type EditorHass } from "./hass-change";
@@ -45,6 +52,14 @@ interface Hass {
   [k: string]: unknown;
 }
 
+const LEVEL_LABEL: Record<"all" | ThresholdLevel, string> = {
+  all: "Alle",
+  source: "Quellen",
+  floor: "Etagen",
+  room: "Räume",
+  consumer: "Verbraucher",
+};
+
 /** Visual editor: every config option has a field (see schema.ts and the coverage test). */
 export class DetailedEnergyCardEditor extends LitElement {
   @property({ attribute: false }) hass?: Hass;
@@ -54,6 +69,8 @@ export class DetailedEnergyCardEditor extends LitElement {
 
   /** short message when an edit was refused, cleared by the next accepted change */
   @state() private _notice?: string;
+  /** which thresholds the editor shows: the shared list or one level */
+  @state() private _thrLevel: "all" | ThresholdLevel = "all";
   private _registries = new RegistrySource(() => this.requestUpdate());
   /** rooms left out when floors were switched on; switching floors off puts them back */
   private _leftOut: RoomConfig[] = [];
@@ -186,6 +203,19 @@ export class DetailedEnergyCardEditor extends LitElement {
     button.icon:disabled {
       opacity: 0.3;
       cursor: default;
+    }
+    .levels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .levels button.add {
+      margin: 4px 0;
+    }
+    .levels button.add.on {
+      background: var(--primary-color);
+      border-style: solid;
+      color: var(--text-primary-color, #fff);
     }
     button.add {
       background: none;
@@ -393,18 +423,61 @@ export class DetailedEnergyCardEditor extends LitElement {
 
   // ---------- color thresholds ----------
 
+  private _thresholdList(level: "all" | ThresholdLevel): ThresholdConfig[] {
+    const c = this._config?.colors;
+    return (level === "all" ? c?.thresholds : c?.level_thresholds?.[level]) ?? [];
+  }
+
   private _setThresholds(list: ThresholdConfig[]): void {
-    if (this._config) this._emit(setPath(this._config, "colors.thresholds", list.length ? list : undefined));
+    if (!this._config) return;
+    const value = list.length ? list : undefined;
+    const level = this._thrLevel;
+    if (level === "all") return this._emit(setPath(this._config, "colors.thresholds", value));
+    const per = { ...this._config.colors?.level_thresholds, [level]: value };
+    if (!value) delete per[level];
+    this._emit(setPath(this._config, "colors.level_thresholds", Object.keys(per).length ? per : undefined));
+  }
+
+  /** Warns when a level lower in the graph (source > floor > room > consumer) has higher limits than the one above it. */
+  private _levelOrderWarnings(): string[] {
+    const top = (level: ThresholdLevel) => {
+      const list = this._config?.colors?.level_thresholds?.[level] ?? this._config?.colors?.thresholds ?? [];
+      return list.length ? Math.max(...list.map((t) => t.from || 0)) : undefined;
+    };
+    const out: string[] = [];
+    THRESHOLD_LEVELS.forEach((upper, i) => {
+      const lower = THRESHOLD_LEVELS[i + 1];
+      if (!lower) return;
+      const a = top(upper);
+      const b = top(lower);
+      if (a !== undefined && b !== undefined && b > a) {
+        out.push(this._tr("Schwellwerte: „{0}“ liegt über „{1}“, obwohl diese Ebene weiter oben liegt.", this._tr(LEVEL_LABEL[lower]), this._tr(LEVEL_LABEL[upper])));
+      }
+    });
+    return out;
   }
 
   private _renderThresholds(): TemplateResult {
-    const list: ThresholdConfig[] = this._config?.colors?.thresholds ?? [];
+    const level = this._thrLevel;
+    const list = this._thresholdList(level);
     const dups = duplicateThresholds(list);
+    const defaults = level === "all" ? DEFAULT_THRESHOLDS : DEFAULT_LEVEL_THRESHOLDS[level];
     const next = (): ThresholdConfig =>
-      DEFAULT_THRESHOLDS[list.length] ?? { from: Math.max(100, ...list.map((t) => t.from || 0)) * 2, color: "#f44336" };
+      defaults[list.length] ?? { from: Math.max(100, ...list.map((t) => t.from || 0)) * 2, color: "#f44336" };
+    const shared = this._config?.colors?.thresholds ?? [];
     return html`
       <h4>${this._tr("Schwellwerte (Farbe nach Leistung)")}</h4>
       <div class="hint">${this._tr("Ab dem jeweiligen Wert (in W) bekommen Linien und Balken diese Farbe, darunter gilt die normale Farbe.")}</div>
+      <div class="hint">${this._tr("Optional gibt eine Stufe auch die Strichstärke vor. Jede Ebene kann eigene Werte haben, sonst gelten die Werte für „Alle“.")}</div>
+      <div class="levels">
+        ${(["all", ...THRESHOLD_LEVELS] as const).map(
+          (l) => html`<button class="add ${l === level ? "on" : ""}" aria-pressed=${l === level ? "true" : "false"}
+            @click=${() => (this._thrLevel = l)}>${this._tr(LEVEL_LABEL[l])}</button>`,
+        )}
+      </div>
+      ${level !== "all" && list.length === 0 && shared.length > 0
+        ? html`<div class="hint">${this._tr("Diese Ebene nutzt die Werte für „Alle“.")}</div>`
+        : nothing}
       ${list.map(
         (t, i) => html`<div class="item">
           <div class="head">
@@ -412,15 +485,20 @@ export class DetailedEnergyCardEditor extends LitElement {
             <button class="icon" title=${this._tr("Entfernen")} aria-label=${this._tr("Entfernen")}
               @click=${() => this._setThresholds(removeItem(list, i))}>✕</button>
           </div>
-          ${this._form(["colors", "thresholds", i], THRESHOLD)}
+          ${this._form(level === "all" ? ["colors", "thresholds", i] : ["colors", "level_thresholds", level, i], THRESHOLD)}
         </div>`,
       )}
       <button class="add" @click=${() => this._setThresholds([...list, next()])}>${this._tr("+ Schwellwert")}</button>
       ${list.length === 0
-        ? html`<button class="add" @click=${() => this._setThresholds(DEFAULT_THRESHOLDS.map((t) => ({ ...t })))}>
-            ${this._tr("Ampel-Farben einfügen")}</button>`
+        ? html`<button class="add" @click=${() => this._setThresholds(defaults.map((t) => ({ ...t })))}>
+            ${this._tr(level === "all" ? "Ampel-Farben einfügen" : "Ampel-Werte für diese Ebene einfügen")}</button>`
+        : nothing}
+      ${level !== "all" && shared.length > 0
+        ? html`<button class="add" @click=${() => this._setThresholds(shared.map((t) => ({ ...t })))}>
+            ${this._tr("Von „Alle“ übernehmen")}</button>`
         : nothing}
       ${dups.map((d) => html`<div class="warn">⚠ ${this._tr("Mehrere Schwellwerte ab {0} W: nur einer davon gilt.", d)}</div>`)}
+      ${this._levelOrderWarnings().map((w) => html`<div class="warn">⚠ ${w}</div>`)}
     `;
   }
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A threshold range can set the line width with `width` (0.5 to 12 px). It replaces the width that follows the power; the list bar takes it as its height.
+- Thresholds per level: `colors.level_thresholds` takes own lists for `source`, `floor`, `room` and `consumer`. A level without its own list uses `colors.thresholds`.
+- Editor: *Colors → Thresholds* has a level selector, a width field per range, traffic-light defaults per level, a button to copy the shared list, and a warning when a level lower in the graph has higher limits than the one above.
+
 ## 0.8.1
 
 ### Changed

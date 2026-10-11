@@ -80,6 +80,25 @@ colors:
     - { from: 2000, color: "#f44336" }
 ```
 
+A range can also set the line width (`width`, 0.5 to 12 px). It replaces the width that follows the power; without `width` the automatic width applies. Each level of the diagram (`source`, `floor`, `room`, `consumer`) can have its own thresholds, because a floor draws far more power than a single device. A level without its own list uses `colors.thresholds`. A line belongs to the level of the node it leads to; `consumer` is the bar in the list:
+
+```yaml
+colors:
+  thresholds:                      # used by every level without its own list
+    - { from: 0, color: "#4caf50", width: 1.5 }
+    - { from: 500, color: "#ff9800", width: 3 }
+    - { from: 2000, color: "#f44336", width: 5 }
+  level_thresholds:
+    floor:
+      - { from: 0, color: "#4caf50", width: 2 }
+      - { from: 1500, color: "#ff9800", width: 3.5 }
+      - { from: 4000, color: "#f44336", width: 5.5 }
+    consumer:
+      - { from: 0, color: "#4caf50" }
+      - { from: 300, color: "#ff9800" }
+      - { from: 1500, color: "#f44336" }
+```
+
 In the visual editor they are under *Colors → Thresholds* (with a traffic-light preset). Every color field takes a single CSS color: hex (`#9184d9`), `rgb()`/`hsl()`, a named color (`orange`) or a theme variable (`var(--primary-color)`); anything else is a configuration error. Only `sensor.*` power entities (W / kW / MW) are supported; a sensor with another unit (for example kWh or V) is not counted as watts and shows a warning on its node. A battery state-of-charge sensor (`soc_entity`) must report `%`. All options are documented in the concept, section 3.
 
 ## Development

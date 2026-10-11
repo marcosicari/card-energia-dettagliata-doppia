@@ -82,7 +82,11 @@ colors:                    # optional – leer = HA-Theme
   thresholds:              # optional: Farbe von Linien und Balken nach Leistung (W)
     - { from: 0, color: "#4caf50" }
     - { from: 500, color: "#ff9800" }
-    - { from: 2000, color: "#f44336" }
+    - { from: 2000, color: "#f44336" }   # optional je Eintrag: width (px, 0,5 bis 12)
+  level_thresholds:        # optional: eigene Schwellwerte je Ebene (source, floor, room, consumer)
+    floor:
+      - { from: 0, color: "#4caf50", width: 2 }
+      - { from: 1500, color: "#ff9800", width: 3.5 }
 options:
   unit: W                  # W | kW | auto
   decimals: 2
@@ -167,7 +171,7 @@ Die Berechnung liegt als reine Funktion in `src/model/compute.ts`, ohne DOM. So 
 - **Linienstärke:** `1 + kW · 0.7`, bei erreichten Schwellwert-Stufen zusätzlich 0,75 je Stufe (höchstens 3).
 - **Animationsdauer:** logarithmisch in der Leistung, von 3,2 s (bis 10 W) bis 0,35 s (ab 5 kW). Je mehr ein Knoten zieht, desto schneller bewegen sich seine Linien; der Unterschied zwischen 100 W und 1 kW ist so gut sichtbar wie der zwischen 1 kW und 10 kW. Ohne Leistung (< 1 W) gibt es keine Animation.
 - **Ohne Verbrauch:** Verbraucher unter 1 W erscheinen ausgegraut in der Liste (gedämpfte Textfarbe und hellerer Balken statt Deckkraft, damit der Text lesbar bleibt), Räume und Etagen ohne Verbrauch abgeblendet im Diagramm.
-- **Schwellwerte:** Ab dem jeweils erreichten `from`-Wert (W) bekommen Linien des gewählten Pfads und die Balken der Liste die zugehörige Farbe; unterhalb des ersten Wertes gilt die normale Farbe. Zusätzlich zeigen höhere Stufen dickere Linien und höhere Balken (+1 px je Stufe), damit die Stufen nicht nur an der Farbe hängen.
+- **Schwellwerte:** Ab dem jeweils erreichten `from`-Wert (W) bekommen Linien des gewählten Pfads und die Balken der Liste die zugehörige Farbe; unterhalb des ersten Wertes gilt die normale Farbe. Zusätzlich zeigen höhere Stufen dickere Linien und höhere Balken (+1 px je Stufe), damit die Stufen nicht nur an der Farbe hängen. Setzt eine Stufe `width` (px), ersetzt dieser Wert die berechnete Linienstärke (bei Balken die Höhe). Je Ebene (`source`, `floor`, `room`, `consumer`) sind eigene Listen unter `colors.level_thresholds` möglich; fehlt eine, gilt `colors.thresholds`. Eine Linie gehört zur Ebene ihres Ziels.
 - **Hervorhebung:** Die gewählte Etage und der gewählte Raum bekommen Akzentfarbe und Glow. Die übrigen Linien sind gedämpft.
 - **Viele Räume:** Ab 7 Räumen in einer Ebene wird die Raumzeile horizontal scrollbar, mit fester Spaltenbreite von 64 px. Alternativ lässt sich per Option auf zwei Reihen umbrechen.
 - **Responsive:** Die SVG-Breite folgt der Kartenbreite (`ResizeObserver`). Knoten werden absolut über dem SVG positioniert.

@@ -271,7 +271,7 @@ export const cardStyles = css`
   }
   .bar {
     /* each reached threshold range adds 1px, a cue besides the color */
-    height: calc(3px + var(--level, 0) * 1px);
+    height: var(--bar-h, calc(3px + var(--level, 0) * 1px));
     border-radius: 2px;
     background: var(--_line);
   }
