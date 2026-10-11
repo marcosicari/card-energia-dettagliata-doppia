@@ -144,6 +144,37 @@ test.describe("focus_selected", () => {
     await expect(node(page, "Küche")).toHaveCSS("opacity", "1");
   });
 
+  test("without floors the rooms hang directly under the home and work the same way", async ({ page }) => {
+    await open(page, "flat");
+    // the scenario has no focus option of its own: turn it on
+    await page.evaluate(() => {
+      const el = document.querySelector("detailed-energy-card") as unknown as { _config: { options?: object }; setConfig(c: object): void };
+      el.setConfig({ ...el._config, options: { ...el._config.options, focus_selected: true } });
+    });
+    const rooms = page.locator("detailed-energy-card button.node:has(.circle.room)");
+    const centers = () => rooms.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left + e.getBoundingClientRect().width / 2)));
+    // all rooms are visible and spread out, none is selected
+    await expect(page.locator("detailed-energy-card .path")).toHaveText("Zuhause");
+    await expect(rooms).toHaveCount(5);
+    const spread = await centers();
+    expect(new Set(spread).size).toBe(5);
+
+    // a room slides to the middle, the others fade out behind it
+    await node(page, "Küche").click();
+    await expect(page.locator("detailed-energy-card .path")).toHaveText("Zuhause › Küche");
+    await hidden(page, "Bad");
+    await expect(node(page, "Küche")).toHaveCSS("opacity", "1");
+    expect(new Set(await centers()).size).toBe(1);
+
+    // clicking the selected room again keeps it, the home shows all rooms again
+    await node(page, "Küche").click();
+    await expect(page.locator("detailed-energy-card .path")).toHaveText("Zuhause › Küche");
+    await home(page).click();
+    await expect(page.locator("detailed-energy-card .path")).toHaveText("Zuhause");
+    await expect(node(page, "Bad")).toHaveCSS("opacity", "1");
+    expect(await centers()).toEqual(spread);
+  });
+
   test("hidden elements cannot be reached or clicked", async ({ page }) => {
     await open(page, "focus");
     await node(page, "EG").click();
