@@ -332,6 +332,7 @@ Alle Farben sind anpassbar, im visuellen Editor (Bereich „Farben“) und per Y
 | **0.9.1** | Schwellwerte pro Element (Quelle, Etage, Raum, Verbraucher) und Editor-Button zum Skalieren der Grenzen. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **0.9.2** | Editor: Schwellwerte und einzelne Stufen sind einklappbar. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **0.9.3** | Raumnamen überlappen auf kleinen Displays nicht mehr, `wrap_rooms` bricht nur um, wenn eine Reihe zu schmal wäre. Details in [CHANGELOG.md](CHANGELOG.md) |
+| **0.10.0** | Neue Option `focus_selected`: die gewählte Etage oder der gewählte Raum gleitet in die Mitte, die anderen blenden aus; ein Klick zeigt immer die Kinder. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.0** | Energie-Modus (kWh heute/Woche) mit `device_class: energy`, Stabilisierung, Aufnahme in HACS-Standard |
 
 ---

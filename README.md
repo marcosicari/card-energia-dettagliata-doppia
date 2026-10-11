@@ -4,7 +4,7 @@
 
 Home Assistant Lovelace card showing the power flow from sources (PV, battery, grid) through the home, optional floors and rooms down to individual consumers. See [Entwicklungskonzept.md](Entwicklungskonzept.md) for the full concept and roadmap.
 
-Status: **0.9.3** (see the [changelog](CHANGELOG.md)). Configure it in the visual editor (German and English) or in YAML.
+Status: **0.10.0** (see the [changelog](CHANGELOG.md)). Configure it in the visual editor (German and English) or in YAML.
 
 ## Preview
 
