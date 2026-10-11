@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Thresholds on single elements: a source, floor, room or consumer can have its own `thresholds` list that replaces the list of its level for that element only. Precedence: element, level, `colors.thresholds`.
+- Editor: every source, floor, room and consumer has a collapsible *Own thresholds* section. Every threshold list also has a "scale limits" button (factor field) that multiplies all limits of the shown list, and a button to copy the parent list.
+
 ## 0.9.0
 
 ### Added

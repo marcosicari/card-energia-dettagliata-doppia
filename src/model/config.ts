@@ -11,11 +11,15 @@ export interface SourceConfig {
   color?: string;
   soc_entity?: string;
   invert?: boolean;
+  /** own thresholds for the line of this source (replace the level thresholds) */
+  thresholds?: ThresholdConfig[];
 }
 
 export interface ConsumerConfig {
   entity: string;
   name?: string;
+  /** own thresholds for the bar of this consumer */
+  thresholds?: ThresholdConfig[];
 }
 
 /** Rooms are Home Assistant areas; name and icon are resolved from the area registry. */
@@ -25,6 +29,8 @@ export interface RoomConfig {
   name?: string;
   icon?: string;
   color?: string;
+  /** own thresholds for the line to this room */
+  thresholds?: ThresholdConfig[];
   consumers?: ConsumerConfig[];
 }
 
@@ -35,6 +41,8 @@ export interface FloorConfig {
   name?: string;
   icon?: string;
   color?: string;
+  /** own thresholds for the line to this floor */
+  thresholds?: ThresholdConfig[];
   rooms?: RoomConfig[];
 }
 
@@ -107,9 +115,11 @@ function checkRoom(room: unknown, where: string): void {
     throw new ConfigError(`${where}: room needs an area_id (a Home Assistant area)`);
   }
   checkColor(room.color, `${where}.color`);
-  list(room.consumers, `${where}.consumers`).forEach((c, i) =>
-    checkEntity(isObj(c) ? c.entity : undefined, `${where}.consumers[${i}]`),
-  );
+  checkThresholds(room.thresholds, `${where}.thresholds`);
+  list(room.consumers, `${where}.consumers`).forEach((c, i) => {
+    checkEntity(isObj(c) ? c.entity : undefined, `${where}.consumers[${i}]`);
+    if (isObj(c)) checkThresholds(c.thresholds, `${where}.consumers[${i}].thresholds`);
+  });
 }
 
 const UNITS = ["auto", "W", "kW"];
@@ -208,6 +218,7 @@ export function validateConfig(raw: unknown): EnergyCardConfig {
     if (s.soc_entity) checkEntity(s.soc_entity, `sources[${i}].soc_entity`);
     checkBool(s.invert, `sources[${i}].invert`);
     checkColor(s.color, `sources[${i}].color`);
+    checkThresholds(s.thresholds, `sources[${i}].thresholds`);
   });
 
   checkColors(raw.colors);
@@ -218,6 +229,7 @@ export function validateConfig(raw: unknown): EnergyCardConfig {
       throw new ConfigError(`floors[${i}]: floor needs a floor_id (a Home Assistant floor)`);
     }
     checkColor(f.color, `floors[${i}].color`);
+    checkThresholds(f.thresholds, `floors[${i}].thresholds`);
     list(f.rooms, `floors[${i}].rooms`).forEach((r, j) => checkRoom(r, `floors[${i}].rooms[${j}]`));
   });
   rooms.forEach((r, i) => checkRoom(r, `rooms[${i}]`));

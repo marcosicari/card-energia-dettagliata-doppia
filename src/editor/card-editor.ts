@@ -71,6 +71,8 @@ export class DetailedEnergyCardEditor extends LitElement {
   @state() private _notice?: string;
   /** which thresholds the editor shows: the shared list or one level */
   @state() private _thrLevel: "all" | ThresholdLevel = "all";
+  /** factor of the "scale limits" button */
+  @state() private _scale = 0.5;
   private _registries = new RegistrySource(() => this.requestUpdate());
   /** rooms left out when floors were switched on; switching floors off puts them back */
   private _leftOut: RoomConfig[] = [];
@@ -216,6 +218,18 @@ export class DetailedEnergyCardEditor extends LitElement {
       background: var(--primary-color);
       border-style: solid;
       color: var(--text-primary-color, #fff);
+    }
+    .own-thresholds {
+      margin: 4px 0 8px;
+    }
+    .scale {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .scale input {
+      width: 5em;
     }
     button.add {
       background: none;
@@ -423,21 +437,6 @@ export class DetailedEnergyCardEditor extends LitElement {
 
   // ---------- color thresholds ----------
 
-  private _thresholdList(level: "all" | ThresholdLevel): ThresholdConfig[] {
-    const c = this._config?.colors;
-    return (level === "all" ? c?.thresholds : c?.level_thresholds?.[level]) ?? [];
-  }
-
-  private _setThresholds(list: ThresholdConfig[]): void {
-    if (!this._config) return;
-    const value = list.length ? list : undefined;
-    const level = this._thrLevel;
-    if (level === "all") return this._emit(setPath(this._config, "colors.thresholds", value));
-    const per = { ...this._config.colors?.level_thresholds, [level]: value };
-    if (!value) delete per[level];
-    this._emit(setPath(this._config, "colors.level_thresholds", Object.keys(per).length ? per : undefined));
-  }
-
   /** Warns when a level lower in the graph (source > floor > room > consumer) has higher limits than the one above it. */
   private _levelOrderWarnings(): string[] {
     const top = (level: ThresholdLevel) => {
@@ -457,14 +456,64 @@ export class DetailedEnergyCardEditor extends LitElement {
     return out;
   }
 
-  private _renderThresholds(): TemplateResult {
-    const level = this._thrLevel;
-    const list = this._thresholdList(level);
+  /**
+   * Editor for one threshold list: the shared one, one level, or the own list of an element.
+   * The list lives at `path` (dotted) inside the object at `owner`. `fallback` is what applies while
+   * the list is empty (shown as a hint, used by "copy" and by "scale" when there is nothing to scale).
+   */
+  private _thresholdEditor(owner: Pointer, path: string, defaults: ThresholdConfig[], fallback: ThresholdConfig[]): TemplateResult {
+    const list = (getPath(getIn(this._config, owner), path) as ThresholdConfig[] | undefined) ?? [];
+    const set = (next: ThresholdConfig[]) =>
+      this._update(owner, (obj: object) => setPath(obj ?? {}, path, next.length ? next : undefined));
     const dups = duplicateThresholds(list);
-    const defaults = level === "all" ? DEFAULT_THRESHOLDS : DEFAULT_LEVEL_THRESHOLDS[level];
     const next = (): ThresholdConfig =>
       defaults[list.length] ?? { from: Math.max(100, ...list.map((t) => t.from || 0)) * 2, color: "#f44336" };
-    const shared = this._config?.colors?.thresholds ?? [];
+    const scale = () => {
+      const base = list.length ? list : fallback;
+      set(base.map((t) => ({ ...t, from: Math.max(0, Math.round((t.from || 0) * this._scale)) })));
+    };
+    return html`
+      ${list.length === 0 && fallback.length > 0
+        ? html`<div class="hint">${this._tr("Hier gelten die Werte der übergeordneten Liste.")}</div>`
+        : nothing}
+      ${list.map(
+        (t, i) => html`<div class="item">
+          <div class="head">
+            <span class="title">${this._tr("ab {0} W", t.from ?? 0)}</span>
+            <button class="icon" title=${this._tr("Entfernen")} aria-label=${this._tr("Entfernen")}
+              @click=${() => set(removeItem(list, i))}>✕</button>
+          </div>
+          ${this._form([...owner, ...path.split("."), i], THRESHOLD)}
+        </div>`,
+      )}
+      <button class="add" @click=${() => set([...list, next()])}>${this._tr("+ Schwellwert")}</button>
+      ${list.length === 0
+        ? html`<button class="add" @click=${() => set(defaults.map((t) => ({ ...t })))}>${this._tr("Ampel-Werte einfügen")}</button>`
+        : nothing}
+      ${fallback.length > 0
+        ? html`<button class="add" @click=${() => set(fallback.map((t) => ({ ...t })))}>${this._tr("Von der übergeordneten Liste übernehmen")}</button>`
+        : nothing}
+      ${list.length > 0 || fallback.length > 0
+        ? html`<div class="scale">
+            <label>${this._tr("Faktor")}
+              <input type="number" min="0.1" step="0.1" .value=${String(this._scale)}
+                @change=${(e: Event) => {
+                  const v = Number((e.target as HTMLInputElement).value);
+                  if (Number.isFinite(v) && v > 0) this._scale = v;
+                }} />
+            </label>
+            <button class="add" @click=${scale}>${this._tr("Grenzen skalieren")}</button>
+          </div>`
+        : nothing}
+      ${dups.map((d) => html`<div class="warn">⚠ ${this._tr("Mehrere Schwellwerte ab {0} W: nur einer davon gilt.", d)}</div>`)}
+    `;
+  }
+
+  private _renderThresholds(): TemplateResult {
+    const level = this._thrLevel;
+    const c = this._config?.colors;
+    const shared = c?.thresholds ?? [];
+    const path = level === "all" ? "thresholds" : `level_thresholds.${level}`;
     return html`
       <h4>${this._tr("Schwellwerte (Farbe nach Leistung)")}</h4>
       <div class="hint">${this._tr("Ab dem jeweiligen Wert (in W) bekommen Linien und Balken diese Farbe, darunter gilt die normale Farbe.")}</div>
@@ -475,31 +524,31 @@ export class DetailedEnergyCardEditor extends LitElement {
             @click=${() => (this._thrLevel = l)}>${this._tr(LEVEL_LABEL[l])}</button>`,
         )}
       </div>
-      ${level !== "all" && list.length === 0 && shared.length > 0
-        ? html`<div class="hint">${this._tr("Diese Ebene nutzt die Werte für „Alle“.")}</div>`
-        : nothing}
-      ${list.map(
-        (t, i) => html`<div class="item">
-          <div class="head">
-            <span class="title">${this._tr("ab {0} W", t.from ?? 0)}</span>
-            <button class="icon" title=${this._tr("Entfernen")} aria-label=${this._tr("Entfernen")}
-              @click=${() => this._setThresholds(removeItem(list, i))}>✕</button>
-          </div>
-          ${this._form(level === "all" ? ["colors", "thresholds", i] : ["colors", "level_thresholds", level, i], THRESHOLD)}
-        </div>`,
+      ${this._thresholdEditor(
+        ["colors"],
+        path,
+        level === "all" ? DEFAULT_THRESHOLDS : DEFAULT_LEVEL_THRESHOLDS[level],
+        level === "all" ? [] : shared,
       )}
-      <button class="add" @click=${() => this._setThresholds([...list, next()])}>${this._tr("+ Schwellwert")}</button>
-      ${list.length === 0
-        ? html`<button class="add" @click=${() => this._setThresholds(defaults.map((t) => ({ ...t })))}>
-            ${this._tr(level === "all" ? "Ampel-Farben einfügen" : "Ampel-Werte für diese Ebene einfügen")}</button>`
-        : nothing}
-      ${level !== "all" && shared.length > 0
-        ? html`<button class="add" @click=${() => this._setThresholds(shared.map((t) => ({ ...t })))}>
-            ${this._tr("Von „Alle“ übernehmen")}</button>`
-        : nothing}
-      ${dups.map((d) => html`<div class="warn">⚠ ${this._tr("Mehrere Schwellwerte ab {0} W: nur einer davon gilt.", d)}</div>`)}
       ${this._levelOrderWarnings().map((w) => html`<div class="warn">⚠ ${w}</div>`)}
     `;
+  }
+
+  /** Collapsible own thresholds of one element; they replace the list of its level. */
+  private _elementThresholds(ptr: Pointer, level: ThresholdLevel): TemplateResult {
+    const key = `${ptr.join(".")}.thr`;
+    const own: ThresholdConfig[] = getIn(this._config, ptr)?.thresholds ?? [];
+    const c = this._config?.colors;
+    const levelList = c?.level_thresholds?.[level] ?? c?.thresholds ?? [];
+    return html`<div class="own-thresholds">
+      <button class="title" aria-expanded=${this._open.has(key) ? "true" : "false"} @click=${() => this._toggleOpen(key)}>
+        ${this._open.has(key) ? "▾" : "▸"} ${this._tr("Eigene Schwellwerte ({0})", own.length)}
+      </button>
+      ${this._open.has(key)
+        ? html`<div class="hint">${this._tr("Ersetzt für dieses Element die Werte der Ebene.")}</div>
+            ${this._thresholdEditor(ptr, "thresholds", DEFAULT_LEVEL_THRESHOLDS[level], levelList)}`
+        : nothing}
+    </div>`;
   }
 
   // ---------- drag and drop (reorder within one list) ----------
@@ -560,7 +609,7 @@ export class DetailedEnergyCardEditor extends LitElement {
           const key = `s${i}`;
           return html`<div class="item" @dragover=${(e: DragEvent) => this._onOver(e, ["sources"])} @drop=${(e: DragEvent) => this._onDrop(e, ["sources"], i)}>
             ${this._itemHead(key, s.name ?? s.type ?? this._tr("Quelle"), s.entity ?? "", ptr, i, sources.length)}
-            ${this._open.has(key) ? this._form(ptr, SOURCE) : nothing}
+            ${this._open.has(key) ? html`${this._form(ptr, SOURCE)}${this._elementThresholds(ptr, "source")}` : nothing}
           </div>`;
         })}
         <button class="add" @click=${() => this._addSource()}>${this._tr("+ Quelle hinzufügen")}</button>
@@ -590,6 +639,7 @@ export class DetailedEnergyCardEditor extends LitElement {
             <button class="icon" title=${this._tr("Entfernen")} aria-label=${this._tr("Entfernen")}
               @click=${() => this._update([...roomPtr, "consumers"], (l) => removeItem(l, i))}>✕</button>
           </div>
+          ${this._elementThresholds(ptr, "consumer")}
         </div>`;
       })}
       <button class="add"
@@ -609,7 +659,7 @@ export class DetailedEnergyCardEditor extends LitElement {
         return html`<div class="item ${nested ? "nested" : ""}" @dragover=${(e: DragEvent) => this._onOver(e, listPtr)} @drop=${(e: DragEvent) => this._onDrop(e, listPtr, i)}>
           ${this._itemHead(key, this._areaName(r.area_id), this._tr("{0} Verbraucher", r.consumers?.length ?? 0), ptr, i, rooms.length)}
           ${this._open.has(key)
-            ? html`${this._form(ptr, roomFields(this._areaOptions(floorId, r.area_id)))}${this._renderConsumers(ptr)}`
+            ? html`${this._form(ptr, roomFields(this._areaOptions(floorId, r.area_id)))}${this._elementThresholds(ptr, "room")}${this._renderConsumers(ptr)}`
             : nothing}
         </div>`;
       })}
@@ -649,7 +699,7 @@ export class DetailedEnergyCardEditor extends LitElement {
                 return html`<div class="item" @dragover=${(e: DragEvent) => this._onOver(e, ["floors"])} @drop=${(e: DragEvent) => this._onDrop(e, ["floors"], i)}>
                   ${this._itemHead(key, this._floorName(f.floor_id), this._tr("{0} Räume", f.rooms?.length ?? 0), ptr, i, floors.length)}
                   ${this._open.has(key)
-                    ? html`${this._form(ptr, floorFields(this._floorChoices(f.floor_id)))}${this._renderRooms([...ptr, "rooms"], true, f.floor_id)}`
+                    ? html`${this._form(ptr, floorFields(this._floorChoices(f.floor_id)))}${this._elementThresholds(ptr, "floor")}${this._renderRooms([...ptr, "rooms"], true, f.floor_id)}`
                     : nothing}
                 </div>`;
               })}

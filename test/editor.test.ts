@@ -17,16 +17,17 @@ const FULL: EnergyCardConfig = {
   title: "Energiefluss",
   home: { total_entity: "sensor.total" },
   sources: [
-    { entity: "sensor.pv", name: "PV", type: "solar", icon: "mdi:solar-power", color: "#f2c94c", soc_entity: "sensor.soc", invert: false },
+    { entity: "sensor.pv", name: "PV", type: "solar", icon: "mdi:solar-power", color: "#f2c94c", soc_entity: "sensor.soc", invert: false, thresholds: [{ from: 100, color: "#ff9800", width: 3 }] },
   ],
   floors: [
     {
       floor_id: "eg",
       color: "#fff",
-      rooms: [{ area_id: "kueche", color: "#fff", consumers: [{ entity: "sensor.a", name: "Backofen" }] }],
+      thresholds: [{ from: 100, color: "#ff9800", width: 3 }],
+      rooms: [{ area_id: "kueche", color: "#fff", thresholds: [{ from: 100, color: "#ff9800", width: 3 }], consumers: [{ entity: "sensor.a", name: "Backofen", thresholds: [{ from: 100, color: "#ff9800", width: 3 }] }] }],
     },
   ],
-  rooms: [{ area_id: "bad", color: "#fff", consumers: [{ entity: "sensor.b", name: "Boiler" }] }],
+  rooms: [{ area_id: "bad", color: "#fff", thresholds: [{ from: 100, color: "#ff9800", width: 3 }], consumers: [{ entity: "sensor.b", name: "Boiler", thresholds: [{ from: 100, color: "#ff9800", width: 3 }] }] }],
   colors: {
     preset: "custom",
     accent: "#111",

@@ -28,6 +28,12 @@ export function sortThresholds(list: ThresholdConfig[] | undefined): ThresholdCo
     .sort((a, b) => a.from - b.from);
 }
 
+/** The own list of an element (source, floor, room, consumer) if it has one, else the list of its level. */
+export function elementThresholds(own: ThresholdConfig[] | undefined, level: ThresholdConfig[]): ThresholdConfig[] {
+  const sorted = sortThresholds(own);
+  return sorted.length ? sorted : level;
+}
+
 /** Sorted thresholds for every level (own list, else the shared one). */
 export function resolveThresholds(
   shared: ThresholdConfig[] | undefined,

@@ -1,4 +1,5 @@
 import type { EnergyCardConfig, RoomConfig, SourceType } from "./config";
+import type { ThresholdConfig } from "./thresholds";
 
 export interface Reading {
   watts: number;
@@ -11,6 +12,8 @@ export interface ConsumerNode {
   name?: string;
   watts: number;
   valid: boolean;
+  /** own thresholds from the config, replace the level thresholds */
+  thresholds?: ThresholdConfig[];
 }
 export interface RoomNode {
   /** area_id from the config; stable across renames */
@@ -18,6 +21,7 @@ export interface RoomNode {
   name: string;
   icon?: string;
   color?: string;
+  thresholds?: ThresholdConfig[];
   watts: number;
   consumers: ConsumerNode[];
 }
@@ -27,6 +31,7 @@ export interface FloorNode {
   name: string;
   icon?: string;
   color?: string;
+  thresholds?: ThresholdConfig[];
   watts: number;
   rooms: RoomNode[];
 }
@@ -36,6 +41,7 @@ export interface SourceNode {
   type: SourceType;
   icon?: string;
   color?: string;
+  thresholds?: ThresholdConfig[];
   /** signed watts after `invert`; solar/generic are clipped at 0 */
   watts: number;
   valid: boolean;
@@ -68,13 +74,14 @@ const DEFAULT_NAMES: Record<SourceType, string> = {
 function computeRoom(room: RoomConfig, read: Reader): RoomNode {
   const consumers = (room.consumers ?? []).map((c) => {
     const r = read(c.entity);
-    return { entity: c.entity, name: c.name, watts: r.valid ? Math.max(0, r.watts) : 0, valid: r.valid };
+    return { entity: c.entity, name: c.name, watts: r.valid ? Math.max(0, r.watts) : 0, valid: r.valid, thresholds: c.thresholds };
   });
   return {
     id: room.area_id,
     name: room.name ?? room.area_id,
     icon: room.icon,
     color: room.color,
+    thresholds: room.thresholds,
     watts: consumers.reduce((s, c) => s + c.watts, 0),
     consumers,
   };
@@ -103,6 +110,7 @@ export function computeModel(
       type,
       icon: s.icon,
       color: s.color,
+      thresholds: s.thresholds,
       watts,
       valid: r.valid,
       reverse: watts < 0,
@@ -116,7 +124,7 @@ export function computeModel(
 
   const floors: FloorNode[] = (cfg.floors ?? []).map((f) => {
     const rooms = (f.rooms ?? []).map((r) => computeRoom(r, read));
-    return { id: f.floor_id, name: f.name ?? f.floor_id, icon: f.icon, color: f.color, watts: rooms.reduce((s, r) => s + r.watts, 0), rooms };
+    return { id: f.floor_id, name: f.name ?? f.floor_id, icon: f.icon, color: f.color, thresholds: f.thresholds, watts: rooms.reduce((s, r) => s + r.watts, 0), rooms };
   });
   const rooms = (cfg.rooms ?? []).map((r) => computeRoom(r, read));
 

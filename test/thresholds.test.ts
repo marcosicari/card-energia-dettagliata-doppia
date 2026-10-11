@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateConfig, ConfigError } from "../src/model/config";
+import { computeModel } from "../src/model/compute";
 import {
   DEFAULT_THRESHOLDS,
   duplicateThresholds,
@@ -11,6 +12,7 @@ import {
   resolveThresholds,
   DEFAULT_LEVEL_THRESHOLDS,
   THRESHOLD_LEVELS,
+  elementThresholds,
 } from "../src/model/thresholds";
 
 const T = sortThresholds(DEFAULT_THRESHOLDS); // 0 green, 500 orange, 2000 red
@@ -150,5 +152,47 @@ describe("per-level threshold configuration", () => {
     expect(() => validateConfig(cfg({ level_thresholds: "x" }))).toThrow(/level_thresholds must be a mapping/);
     expect(() => validateConfig(cfg({ level_thresholds: { room: [{ from: -1, color: "#fff" }] } }))).toThrow(/level_thresholds\.room\[0\]\.from/);
     expect(() => validateConfig(cfg({ level_thresholds: { floor: [{ from: 0, color: "#fff" }, { from: 5 }] } }))).toThrow(/level_thresholds\.floor\[1\]\.color/);
+  });
+});
+
+describe("elementThresholds", () => {
+  const level = sortThresholds([{ from: 0, color: "#111" }]);
+  it("prefers the own list of an element, sorted", () => {
+    const own = [{ from: 500, color: "#333" }, { from: 100, color: "#222" }];
+    expect(elementThresholds(own, level).map((t) => t.from)).toEqual([100, 500]);
+  });
+  it("falls back to the level for no or only invalid own entries", () => {
+    expect(elementThresholds(undefined, level)).toBe(level);
+    expect(elementThresholds([], level)).toBe(level);
+    expect(elementThresholds([{ from: -1, color: "#333" }], level)).toBe(level);
+  });
+});
+
+describe("thresholds on elements", () => {
+  const T = [{ from: 100, color: "#ff9800", width: 3 }];
+  const full = {
+    type: "x",
+    sources: [{ entity: "sensor.pv", thresholds: T }],
+    floors: [{ floor_id: "eg", thresholds: T, rooms: [{ area_id: "kueche", thresholds: T, consumers: [{ entity: "sensor.a", thresholds: T }] }] }],
+  };
+  it("accepts valid lists on sources, floors, rooms and consumers", () => {
+    expect(() => validateConfig(full)).not.toThrow();
+    expect(() => validateConfig({ type: "x", rooms: [{ area_id: "bad", thresholds: T, consumers: [{ entity: "sensor.b", thresholds: T }] }] })).not.toThrow();
+  });
+  it("names the path of a bad entry", () => {
+    const bad = [{ from: 0, color: "#fff", width: 99 }];
+    expect(() => validateConfig({ ...full, sources: [{ entity: "sensor.pv", thresholds: bad }] })).toThrow(/sources\[0\]\.thresholds\[0\]\.width/);
+    expect(() => validateConfig({ type: "x", floors: [{ floor_id: "eg", thresholds: "x" }] })).toThrow(/floors\[0\]\.thresholds must be a list/);
+    expect(() => validateConfig({ type: "x", rooms: [{ area_id: "a", thresholds: [{ from: -1, color: "#fff" }] }] })).toThrow(/rooms\[0\]\.thresholds\[0\]\.from/);
+    expect(() =>
+      validateConfig({ type: "x", rooms: [{ area_id: "a", consumers: [{ entity: "sensor.a", thresholds: [{ from: 1 }] }] }] }),
+    ).toThrow(/rooms\[0\]\.consumers\[0\]\.thresholds\[0\]\.color/);
+  });
+  it("carries them into the model nodes", () => {
+    const m = computeModel(full as never, () => ({ watts: 10, valid: true }));
+    expect(m.sources[0].thresholds).toEqual(T);
+    expect(m.floors[0].thresholds).toEqual(T);
+    expect(m.floors[0].rooms[0].thresholds).toEqual(T);
+    expect(m.floors[0].rooms[0].consumers[0].thresholds).toEqual(T);
   });
 });
