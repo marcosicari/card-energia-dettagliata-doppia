@@ -98,10 +98,16 @@ test.describe("focus_selected", () => {
 
   test("a click on an element always shows its children, the selected one slides to the middle", async ({ page }) => {
     await open(page, "focus");
-    // the largest floor is selected by default: it sits in the middle, the others are hidden behind it
+    // it starts with the first level fully visible: all floors, spread out, and no room row
+    await shown(page, "EG");
+    await shown(page, "OG");
+    await shown(page, "Keller");
+    await expect(node(page, "Küche")).toHaveCount(0);
+    await expect(page.locator("detailed-energy-card .path")).toHaveText("Zuhause");
+
+    // a floor slides to the middle and the other floors fade out behind it
+    await node(page, "EG").click();
     await hidden(page, "OG");
-    await hidden(page, "Keller");
-    await expect(node(page, "OG")).toHaveClass(/ghost/);
     await expect(node(page, "Küche")).toBeVisible();
 
     // the home shows all floors again, spread out
@@ -140,6 +146,8 @@ test.describe("focus_selected", () => {
 
   test("hidden elements cannot be reached or clicked", async ({ page }) => {
     await open(page, "focus");
+    await node(page, "EG").click();
+    await hidden(page, "OG");
     await expect(node(page, "OG")).toHaveAttribute("aria-hidden", "true");
     await expect(node(page, "OG")).toHaveAttribute("tabindex", "-1");
     await expect(node(page, "OG")).toHaveCSS("pointer-events", "none");

@@ -207,7 +207,7 @@ export class DetailedEnergyCard extends LitElement {
     }
   }
 
-  /** Applies the stored selection: the largest floor by default, all of its rooms unless one is chosen. */
+  /** Applies the stored selection: the largest floor by default (all floors with focus_selected), all of its rooms unless one is chosen. */
   private _resolve(model: EnergyModel): { floor?: number; rooms: RoomNode[]; room?: number } {
     const largest = <T extends { watts: number }>(list: T[]) =>
       list.reduce((best, x, i) => (x.watts > list[best].watts ? i : best), 0);
@@ -215,8 +215,10 @@ export class DetailedEnergyCard extends LitElement {
     let rooms = model.rooms;
     if (model.floors.length) {
       const i = model.floors.findIndex((f) => f.id === this._sel.floor);
-      // no single floor selected: all floors count as selected and the room row is hidden
-      floor = this._sel.floor === null ? undefined : i >= 0 ? i : largest(model.floors);
+      // no single floor selected: all floors count as selected and the room row is hidden;
+      // with focus_selected the card starts like this too, so the first level is fully visible
+      const byDefault = this._focus ? undefined : largest(model.floors);
+      floor = this._sel.floor === null ? undefined : i >= 0 ? i : byDefault;
       rooms = floor === undefined ? [] : model.floors[floor].rooms;
     }
     const r = rooms.findIndex((x) => x.id === this._sel.room);

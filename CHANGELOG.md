@@ -4,7 +4,7 @@
 
 ### Added
 
-- `options.focus_selected` (default off): the selected floor or room slides to the middle under its parent while the other elements of its level fade out behind it. Its children are spread around the new middle as usual. A click on an element always shows its children: the home shows all floors, a floor (also the selected one) shows all its rooms. Hidden elements cannot be clicked or reached with the keyboard. With reduced motion nothing slides, elements only fade.
+- `options.focus_selected` (default off): the selected floor or room slides to the middle under its parent while the other elements of its level fade out behind it. Its children are spread around the new middle as usual. A click on an element always shows its children: the home shows all floors, a floor (also the selected one) shows all its rooms. With the option the card starts with all floors visible (no floor is preselected), so the first level is always fully shown. Hidden elements cannot be clicked or reached with the keyboard. With reduced motion nothing slides, elements only fade.
 - Editor: a switch for it under *General*.
 
 ## 0.9.3
