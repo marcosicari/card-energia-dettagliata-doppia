@@ -80,6 +80,16 @@ test("many rooms wrap into two rows when enabled", async ({ page }) => {
   expect(tops).toHaveLength(2);
 });
 
+test("wrapping rooms is skipped when a single row has enough room", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.goto("/dev/index.html?scenario=wrap&width=1200");
+  await expect(page.locator("detailed-energy-card .circle.room").first()).toBeVisible();
+  const tops = await page.locator("detailed-energy-card .circle.room").evaluateAll((els) =>
+    [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().top)))],
+  );
+  expect(tops).toHaveLength(1);
+});
+
 test("an invalid configuration shows a readable error", async ({ page }) => {
   await page.goto("/dev/index.html?scenario=invalid");
   await expect(page.locator("detailed-energy-card .error")).toContainText("area_id");

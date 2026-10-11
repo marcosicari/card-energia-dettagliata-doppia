@@ -37,6 +37,8 @@ interface Hass {
 
 /** More ranges than this do not get any thicker. */
 const MAX_LEVEL = 3;
+/** Room columns narrower than this get a smaller label font, so that more of the name stays readable. */
+const TIGHT_COL_W = 90;
 
 const SOURCE_ICONS: Record<string, string> = {
   solar: "mdi:white-balance-sunny",
@@ -278,7 +280,7 @@ export class DetailedEnergyCard extends LitElement {
             ${model.sources.map((s, i) => this._renderSource(s, layout.sourceXs[i]))}
             ${this._renderHome(model, layout, home, allFloors || (!model.floors.length && allRooms))}
             ${model.floors.map((f, i) => this._renderFloor(f.id, f.name, f.watts, f.color, layout.floorXs[i], layout.yFloor, i === sel.floor, allFloors))}
-            ${sel.rooms.map((r, i) => this._renderRoom(r, layout.roomXs[i], layout.roomYs[i], i === sel.room, allRooms))}
+            ${sel.rooms.map((r, i) => this._renderRoom(r, layout.roomXs[i], layout.roomYs[i], layout.roomColW, i === sel.room, allRooms))}
           </div>
         </div>
         ${this._renderDetail(model, detailRoom)}
@@ -385,11 +387,11 @@ export class DetailedEnergyCard extends LitElement {
     `;
   }
 
-  private _renderRoom(r: RoomNode, x: number, y: number, selected: boolean, allRooms = false): TemplateResult {
+  private _renderRoom(r: RoomNode, x: number, y: number, colW: number, selected: boolean, allRooms = false): TemplateResult {
     return html`
       <button
-        class="node ${isIdle(r.watts) ? "idle" : ""}"
-        style=${styleMap({ left: `${x}px`, top: `${y}px`, "--node-color": r.color ?? "" })}
+        class="node ${isIdle(r.watts) ? "idle" : ""} ${colW < TIGHT_COL_W ? "tight" : ""}"
+        style=${styleMap({ left: `${x}px`, top: `${y}px`, width: `${Math.max(0, colW - 4)}px`, "--node-color": r.color ?? "" })}
         aria-pressed=${selected}
         title=${r.name}
         @click=${() => this._select({ ...this._sel, room: selected ? null : r.id })}

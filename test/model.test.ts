@@ -147,7 +147,7 @@ describe("layout", () => {
   });
 });
 
-import { roomPositions, MAX_ROOMS_PER_ROW } from "../src/view/layout";
+import { roomPositions, MAX_ROOMS_PER_ROW, ROOM_FIT_W } from "../src/view/layout";
 
 describe("wrapped rooms", () => {
   it("keeps one row up to the limit and when wrapping is off", () => {
@@ -167,6 +167,25 @@ describe("wrapped rooms", () => {
     expect(wrapped.roomRows).toBe(2);
     expect(wrapped.height).toBe(flat.height + 96);
     expect(new Set(wrapped.roomYs).size).toBe(2);
+  });
+  it("computeLayout wraps only when a single row would be too narrow", () => {
+    const rooms = 10;
+    const enough = rooms * ROOM_FIT_W;
+    const wide = computeLayout({ width: enough, sources: 0, floors: 0, rooms, wrap: true });
+    expect(wide.roomRows).toBe(1);
+    expect(new Set(wide.roomYs).size).toBe(1);
+    const narrow = computeLayout({ width: enough - 1, sources: 0, floors: 0, rooms, wrap: true });
+    expect(narrow.roomRows).toBe(2);
+    // few rooms never wrap, however narrow the card is
+    expect(computeLayout({ width: 200, sources: 0, floors: 0, rooms: MAX_ROOMS_PER_ROW, wrap: true }).roomRows).toBe(1);
+  });
+  it("computeLayout gives every room node the distance between neighbours as its width", () => {
+    expect(computeLayout({ width: 600, sources: 0, floors: 0, rooms: 4 }).roomColW).toBe(150);
+    // wrapped: 10 rooms use 6 columns in the first row, the second row sits in the gaps between them
+    const wrapped = computeLayout({ width: 600, sources: 0, floors: 0, rooms: 10, wrap: true });
+    expect(wrapped.roomColW).toBe(wrapped.width / 6);
+    // never narrower than the minimum column width, the graph scrolls instead
+    expect(computeLayout({ width: 100, sources: 0, floors: 0, rooms: 10 }).roomColW).toBe(64);
   });
 });
 

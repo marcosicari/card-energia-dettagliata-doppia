@@ -4,8 +4,10 @@ export const HOME_H = 66;
 export const FLOOR_H = 48;
 export const ROOM_H = 96;
 export const ROOM_COL_W = 64;
-/** More rooms than this in one row scroll horizontally, or wrap into two rows if enabled. */
+/** Wrapping into two rows is only offered for more rooms than this ... */
 export const MAX_ROOMS_PER_ROW = 6;
+/** ... and only when a single row would give each room less than this much width. */
+export const ROOM_FIT_W = 80;
 
 export interface LayoutInput {
   width: number;
@@ -27,6 +29,8 @@ export interface Layout {
   sourceXs: number[];
   floorXs: number[];
   roomXs: number[];
+  /** width available to one room node: the distance between neighbours in a row (labels are cut to it) */
+  roomColW: number;
   /** y position of each room (two rows when wrapped) */
   roomYs: number[];
   roomRows: number;
@@ -56,7 +60,7 @@ export function roomPositions(n: number, width: number, wrap: boolean): { xs: nu
 
 export function computeLayout(i: LayoutInput): Layout {
   // Rows keep a fixed minimum column width; too many rooms scroll horizontally.
-  const wrapped = !!i.wrap && i.rooms > MAX_ROOMS_PER_ROW;
+  const wrapped = !!i.wrap && i.rooms > MAX_ROOMS_PER_ROW && i.rooms * ROOM_FIT_W > i.width;
   const perRow = wrapped ? wrapColumns(i.rooms) : i.rooms;
   const width = Math.max(i.width, perRow * ROOM_COL_W);
   const yHome = i.sources > 0 ? 124 : 0;
@@ -76,6 +80,7 @@ export function computeLayout(i: LayoutInput): Layout {
     sourceXs: distribute(i.sources, width),
     floorXs: distribute(i.floors, width),
     roomXs: rooms.xs,
+    roomColW: perRow > 0 ? width / perRow : width,
     roomYs: rooms.row.map((r) => yRoom + r * ROOM_H),
     roomRows,
   };

@@ -210,6 +210,10 @@ export const cardStyles = css`
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* narrow room columns (many rooms, small displays): smaller labels, names are cut with an ellipsis instead of running into the neighbour */
+  .node.tight .label {
+    font-size: 0.75em;
+  }
   .value {
     font-weight: 600;
     white-space: nowrap;
