@@ -241,6 +241,9 @@
         ),
       };
 
+      // The selected floor or room slides to the middle, the others fade out (options.focus_selected).
+      scenarios.focus = { ...scenarios.floors, options: { unit: "kW", focus_selected: true } };
+
       const params = new URLSearchParams(location.search);
       // ?width=900 lets the card grow wider than the default 480px preview column
       if (params.get("width")) document.body.style.maxWidth = params.get("width") + "px";

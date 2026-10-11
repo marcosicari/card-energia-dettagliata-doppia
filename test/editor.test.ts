@@ -44,7 +44,7 @@ const FULL: EnergyCardConfig = {
       consumer: [{ from: 300, color: "#ff9800", width: 3 }],
     },
   },
-  options: { unit: "auto", decimals: 2, animation: true, show_unassigned: true, remember_selection: true, wrap_rooms: false },
+  options: { unit: "auto", decimals: 2, animation: true, show_unassigned: true, remember_selection: true, wrap_rooms: false, focus_selected: false },
 };
 
 describe("editor coverage", () => {

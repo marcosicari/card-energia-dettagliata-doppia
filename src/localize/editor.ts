@@ -21,6 +21,8 @@ const EN: Record<string, string> = {
   "„Nicht erfasst“ anzeigen": "Show \"Unassigned\"",
   "Auswahl merken": "Remember selection",
   "Viele Räume in zwei Reihen umbrechen (statt scrollen)": "Wrap many rooms into two rows (instead of scrolling)",
+  "Gewählte Etage oder gewählten Raum in die Mitte schieben (die anderen blenden aus)":
+    "Move the selected floor or room to the middle (the others fade out)",
   // colors
   Voreinstellung: "Preset",
   "Akzent / Auswahl": "Accent / selection",

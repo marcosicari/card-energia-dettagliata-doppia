@@ -12,6 +12,7 @@ import { buildStubConfig, type StubHass } from "./model/stub-config";
 import "./editor/card-editor";
 import { defineOnce, registerCardOnce } from "./register";
 import { RegistrySource, resolveNames, type AreaEntry, type FloorEntry } from "./model/registry";
+import { Tween, focusTargets, type Pos } from "./view/focus";
 import { parseSelection, removeLegacyKeys, selectionKey, type Selection } from "./model/selection";
 import {
   computeLayout,
@@ -40,6 +41,16 @@ const MAX_LEVEL = 3;
 /** Room columns narrower than this get a smaller label font, so that more of the name stays readable. */
 const TIGHT_COL_W = 90;
 
+/** A room with where it is shown; rooms of a floor that was just left are still drawn while they fade out. */
+interface RoomView {
+  room: RoomNode;
+  p: Pos;
+  leaving: boolean;
+}
+
+/** Inline opacity of a node that is fading; undefined leaves it to the stylesheet (idle nodes are dimmed there). */
+const fade = (o: number, idle: boolean): string | undefined => (o >= 1 ? undefined : String(o * (idle ? 0.45 : 1)));
+
 const SOURCE_ICONS: Record<string, string> = {
   solar: "mdi:white-balance-sunny",
   battery: "mdi:battery-high",
@@ -61,6 +72,13 @@ export class DetailedEnergyCard extends LitElement {
   private _ro?: ResizeObserver;
   private _io?: IntersectionObserver;
   private _observed?: Element;
+  /** slide after a selection change (only with options.focus_selected) */
+  private _tween?: Tween;
+  private _raf = 0;
+  private _lastSelKey?: string;
+  /** what the previous render showed, the start of the next slide */
+  private _lastShown = new Map<string, Pos>();
+  private _lastRooms = new Map<string, RoomNode>();
   /** Config with names from the registry; rebuilt only when the config or the registry changes. */
   private _resolved?: { reg: object; cfg: EnergyCardConfig };
   private _registries = new RegistrySource(() => {
@@ -135,6 +153,8 @@ export class DetailedEnergyCard extends LitElement {
     this._ro?.disconnect();
     this._io?.disconnect();
     this._io = undefined;
+    cancelAnimationFrame(this._raf);
+    this._tween = undefined;
     this.classList.remove("offscreen");
     this._observed = undefined;
     super.disconnectedCallback();
@@ -217,6 +237,22 @@ export class DetailedEnergyCard extends LitElement {
 
   private _thresholds = resolveThresholds(undefined, undefined);
 
+  private get _focus(): boolean {
+    return this._config?.options?.focus_selected === true;
+  }
+
+  private _startTween(next: Map<string, Pos>, origin: Pos): void {
+    const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const tween = new Tween(this._lastShown, next, () => origin, reduced, performance.now());
+    this._tween = tween;
+    cancelAnimationFrame(this._raf);
+    const step = () => {
+      this.requestUpdate();
+      if (this._tween === tween && !tween.finished(performance.now())) this._raf = requestAnimationFrame(step);
+    };
+    this._raf = requestAnimationFrame(step);
+  }
+
   private _moreInfo(entityId: string): void {
     this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true }));
   }
@@ -263,6 +299,41 @@ export class DetailedEnergyCard extends LitElement {
       : room;
     const path = [home, floor?.name, room?.name].filter(Boolean).join(" › ");
 
+    // Positions of the floors and rooms. With options.focus_selected the selected element of a level
+    // slides to the middle under its parent and the rest of that level fades out behind it.
+    const tg = focusTargets({
+      layout,
+      floors: model.floors.length,
+      selFloor: sel.floor,
+      rooms: sel.rooms.length,
+      selRoom: sel.room,
+      focus: this._focus,
+    });
+    const targets = new Map<string, Pos>();
+    model.floors.forEach((f, i) => targets.set(`f:${f.id}`, tg.floors[i]));
+    sel.rooms.forEach((r, i) => targets.set(`r:${r.id}`, tg.rooms[i]));
+    const selKey = `${sel.floor ?? ""}|${sel.room ?? ""}`;
+    if (this._focus && this._lastSelKey !== undefined && selKey !== this._lastSelKey) {
+      const parent = sel.floor !== undefined ? tg.floors[sel.floor] : { x: layout.homeX, y: layout.yHome, o: 1 };
+      this._startTween(targets, { x: parent.x, y: parent.y + FLOOR_H / 2, o: 0 });
+    }
+    this._lastSelKey = selKey;
+    const now = performance.now();
+    if (this._tween?.finished(now)) this._tween = undefined;
+    const pos = (id: string): Pos => this._tween?.sample(id, now) ?? targets.get(id) ?? { x: 0, y: 0, o: 0 };
+    const floorViews = model.floors.map((f) => pos(`f:${f.id}`));
+    sel.rooms.forEach((r) => this._lastRooms.set(r.id, r));
+    const roomViews: RoomView[] = sel.rooms.map((r) => ({ room: r, p: pos(`r:${r.id}`), leaving: false }));
+    // rooms of a floor that was just left fade out where they were
+    for (const id of this._tween?.leaving ?? []) {
+      const gone = id.startsWith("r:") ? this._lastRooms.get(id.slice(2)) : undefined;
+      if (gone) roomViews.push({ room: gone, p: pos(id), leaving: true });
+    }
+    this._lastShown = new Map([
+      ...model.floors.map((f, i) => [`f:${f.id}`, floorViews[i]] as const),
+      ...roomViews.map((v) => [`r:${v.room.id}`, v.p] as const),
+    ]);
+
     return html`
       <ha-card style=${colorVars(cfg.colors)}>
         <header>
@@ -276,11 +347,11 @@ export class DetailedEnergyCard extends LitElement {
         </header>
         <div class="scroll">
           <div class="graph" style=${styleMap({ width: `${layout.width}px`, height: `${layout.height}px` })}>
-            ${this._renderLines(model, layout, sel.floor, sel.room, allRooms, allFloors)}
+            ${this._renderLines(model, layout, floorViews, roomViews, sel.floor, sel.room, allRooms, allFloors)}
             ${model.sources.map((s, i) => this._renderSource(s, layout.sourceXs[i]))}
             ${this._renderHome(model, layout, home, allFloors || (!model.floors.length && allRooms))}
-            ${model.floors.map((f, i) => this._renderFloor(f.id, f.name, f.watts, f.color, layout.floorXs[i], layout.yFloor, i === sel.floor, allFloors))}
-            ${sel.rooms.map((r, i) => this._renderRoom(r, layout.roomXs[i], layout.roomYs[i], layout.roomColW, i === sel.room, allRooms))}
+            ${model.floors.map((f, i) => this._renderFloor(f.id, f.name, f.watts, f.color, floorViews[i], i === sel.floor, allFloors))}
+            ${roomViews.map((v) => this._renderRoom(v.room, v.p, layout.roomColW, !v.leaving && v.room.id === sel.rooms[sel.room ?? -1]?.id, allRooms, v.leaving))}
           </div>
         </div>
         ${this._renderDetail(model, detailRoom)}
@@ -288,11 +359,11 @@ export class DetailedEnergyCard extends LitElement {
     `;
   }
 
-  private _renderLines(model: EnergyModel, l: Layout, floorIdx?: number, roomIdx?: number, allRooms = false, allFloors = false): TemplateResult {
+  private _renderLines(model: EnergyModel, l: Layout, floorViews: Pos[], roomViews: RoomView[], floorIdx?: number, roomIdx?: number, allRooms = false, allFloors = false): TemplateResult {
     const animate = this._config?.options?.animation !== false;
     const thresholds = this._thresholds;
     // a line belongs to the level of the node it leads to
-    const line = (lvl: ThresholdLevel, own: ThresholdConfig[] | undefined, d: string, watts: number, active: boolean, reverse = false) => {
+    const line = (lvl: ThresholdLevel, own: ThresholdConfig[] | undefined, d: string, watts: number, active: boolean, reverse = false, opacity = 1) => {
       const dur = flowDuration(watts);
       // only lines of the selected path take the threshold color, the others stay muted
       const list = elementThresholds(own, thresholds[lvl]);
@@ -304,7 +375,7 @@ export class DetailedEnergyCard extends LitElement {
         class="line ${active ? "active" : ""} ${dur && animate ? "flowing" : ""} ${reverse ? "reverse" : ""}"
         d=${d}
         stroke-width=${width}
-        style=${(dur ? `--dur:${dur}s;` : "") + (color ? `stroke:${color}` : "")}
+        style=${(dur ? `--dur:${dur}s;` : "") + (color ? `stroke:${color};` : "") + (opacity < 1 ? `opacity:${opacity}` : "")}
       />`;
     };
     const parts: TemplateResult[] = [];
@@ -315,16 +386,18 @@ export class DetailedEnergyCard extends LitElement {
     let roomFromX = l.homeX;
     let roomFromY = homeBottom;
     model.floors.forEach((f, i) => {
-      parts.push(line("floor", f.thresholds, curve(l.homeX, homeBottom, l.floorXs[i], l.yFloor), f.watts, allFloors || i === floorIdx));
+      const p = floorViews[i];
+      parts.push(line("floor", f.thresholds, curve(l.homeX, homeBottom, p.x, p.y), f.watts, allFloors || i === floorIdx, false, p.o));
       if (i === floorIdx) {
-        roomFromX = l.floorXs[i];
-        roomFromY = l.yFloor + FLOOR_H;
+        roomFromX = p.x;
+        roomFromY = p.y + FLOOR_H;
       }
     });
-    const rooms = floorIdx !== undefined ? model.floors[floorIdx].rooms : model.rooms;
-    rooms.forEach((r, i) => {
-      parts.push(line("room", r.thresholds, roomPath(roomFromX, roomFromY, l.roomXs[i], l.roomYs[i], l.yRoom), r.watts, allRooms || i === roomIdx));
-    });
+    roomViews
+      .filter((v) => !v.leaving)
+      .forEach(({ room: r, p }, i) => {
+        parts.push(line("room", r.thresholds, roomPath(roomFromX, roomFromY, p.x, p.y, l.yRoom), r.watts, allRooms || i === roomIdx, false, p.o));
+      });
     return html`<svg class="lines" width=${l.width} height=${l.height}>${parts}</svg>`;
   }
 
@@ -373,28 +446,32 @@ export class DetailedEnergyCard extends LitElement {
     `;
   }
 
-  private _renderFloor(id: string, name: string, watts: number, color: string | undefined, x: number, y: number, selected: boolean, allFloors = false): TemplateResult {
+  private _renderFloor(id: string, name: string, watts: number, color: string | undefined, p: Pos, selected: boolean, allFloors = false): TemplateResult {
     return html`
       <button
-        class="node ${isIdle(watts) ? "idle" : ""}"
-        style=${styleMap({ left: `${x}px`, top: `${y}px`, "--node-color": color ?? "" })}
+        class="node ${isIdle(watts) ? "idle" : ""} ${p.o < 0.5 ? "ghost" : ""}"
+        style=${styleMap({ left: `${p.x}px`, top: `${p.y}px`, opacity: fade(p.o, isIdle(watts)), "--node-color": color ?? "" })}
         aria-pressed=${selected}
+        aria-hidden=${p.o < 0.5 ? "true" : nothing}
+        tabindex=${p.o < 0.5 ? "-1" : nothing}
         title=${name}
-        @click=${() => this._select(selected ? { floor: null } : { floor: id })}
+        @click=${() => this._select(selected && !this._focus ? { floor: null } : { floor: id })}
       >
         <span class="pill ${selected || allFloors ? "selected" : ""}">${name}<small>${this._fmt(watts)}</small></span>
       </button>
     `;
   }
 
-  private _renderRoom(r: RoomNode, x: number, y: number, colW: number, selected: boolean, allRooms = false): TemplateResult {
+  private _renderRoom(r: RoomNode, p: Pos, colW: number, selected: boolean, allRooms = false, leaving = false): TemplateResult {
     return html`
       <button
-        class="node ${isIdle(r.watts) ? "idle" : ""} ${colW < TIGHT_COL_W ? "tight" : ""}"
-        style=${styleMap({ left: `${x}px`, top: `${y}px`, width: `${Math.max(0, colW - 4)}px`, "--node-color": r.color ?? "" })}
+        class="node ${isIdle(r.watts) ? "idle" : ""} ${colW < TIGHT_COL_W ? "tight" : ""} ${p.o < 0.5 || leaving ? "ghost" : ""}"
+        style=${styleMap({ left: `${p.x}px`, top: `${p.y}px`, width: `${Math.max(0, colW - 4)}px`, opacity: fade(p.o, isIdle(r.watts)), "--node-color": r.color ?? "" })}
         aria-pressed=${selected}
+        aria-hidden=${p.o < 0.5 || leaving ? "true" : nothing}
+        tabindex=${p.o < 0.5 || leaving ? "-1" : nothing}
         title=${r.name}
-        @click=${() => this._select({ ...this._sel, room: selected ? null : r.id })}
+        @click=${() => this._select({ ...this._sel, room: selected && !this._focus ? null : r.id })}
       >
         <span class="circle room ${selected || allRooms ? "selected" : ""}"><ha-icon icon=${r.icon ?? "mdi:door"}></ha-icon></span>
         <span class="label">${r.name}</span>

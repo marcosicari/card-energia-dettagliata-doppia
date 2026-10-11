@@ -67,6 +67,8 @@ export interface OptionsConfig {
   show_unassigned?: boolean;
   remember_selection?: boolean;
   wrap_rooms?: boolean;
+  /** the selected floor / room slides to the middle under its parent, the others of its level fade out */
+  focus_selected?: boolean;
 }
 
 export interface EnergyCardConfig {
@@ -138,7 +140,7 @@ function checkOptions(options: unknown): void {
   if (d !== undefined && (typeof d !== "number" || !Number.isInteger(d) || d < 0 || d > MAX_DECIMALS)) {
     throw new ConfigError(`options.decimals must be a whole number from 0 to ${MAX_DECIMALS}`);
   }
-  for (const key of ["animation", "show_unassigned", "remember_selection", "wrap_rooms"]) {
+  for (const key of ["animation", "show_unassigned", "remember_selection", "wrap_rooms", "focus_selected"]) {
     checkBool(options[key], `options.${key}`);
   }
 }

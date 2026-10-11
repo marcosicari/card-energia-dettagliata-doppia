@@ -61,6 +61,7 @@ export const GENERAL: Field[] = [
   { path: "options.show_unassigned", selector: { boolean: {} }, label: "„Nicht erfasst“ anzeigen", default: true },
   { path: "options.remember_selection", selector: { boolean: {} }, label: "Auswahl merken", default: true },
   { path: "options.wrap_rooms", selector: { boolean: {} }, label: "Viele Räume in zwei Reihen umbrechen (statt scrollen)", default: false },
+  { path: "options.focus_selected", selector: { boolean: {} }, label: "Gewählte Etage oder gewählten Raum in die Mitte schieben (die anderen blenden aus)", default: false },
 ];
 
 export const COLORS: Field[] = [

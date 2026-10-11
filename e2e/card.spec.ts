@@ -90,6 +90,69 @@ test("wrapping rooms is skipped when a single row has enough room", async ({ pag
   expect(tops).toHaveLength(1);
 });
 
+test.describe("focus_selected", () => {
+  const home = (page: Page) => page.locator("detailed-energy-card button.node:has(.circle.home)");
+  const left = async (page: Page, title: string) => Math.round(await node(page, title).evaluate((el) => el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2));
+  const hidden = (page: Page, title: string) => expect(node(page, title)).toHaveCSS("opacity", "0");
+  const shown = (page: Page, title: string) => expect(node(page, title)).not.toHaveClass(/ghost/);
+
+  test("a click on an element always shows its children, the selected one slides to the middle", async ({ page }) => {
+    await open(page, "focus");
+    // the largest floor is selected by default: it sits in the middle, the others are hidden behind it
+    await hidden(page, "OG");
+    await hidden(page, "Keller");
+    await expect(node(page, "OG")).toHaveClass(/ghost/);
+    await expect(node(page, "Küche")).toBeVisible();
+
+    // the home shows all floors again, spread out
+    await home(page).click();
+    await shown(page, "OG");
+    await expect(node(page, "OG")).toHaveCSS("opacity", "1");
+    await expect(node(page, "Küche")).toHaveCount(0);
+    expect(await left(page, "EG")).toBeLessThan(await left(page, "OG"));
+    expect(await left(page, "OG")).toBeLessThan(await left(page, "Keller"));
+
+    // a floor slides to the middle and the other floors fade out behind it
+    await node(page, "OG").click();
+    await hidden(page, "EG");
+    await hidden(page, "Keller");
+    await expect(node(page, "OG")).toHaveCSS("opacity", "1");
+    await expect(node(page, "Bad")).toBeVisible();
+    expect(await left(page, "EG")).toBe(await left(page, "OG"));
+
+    // a room slides to the middle, the other rooms fade out
+    await home(page).click();
+    await node(page, "EG").click();
+    await expect(node(page, "Wohnzimmer")).toHaveCSS("opacity", "1");
+    await node(page, "Küche").click();
+    await expect(page.locator("detailed-energy-card .path")).toHaveText("Zuhause › EG › Küche");
+    await hidden(page, "Wohnzimmer");
+    await hidden(page, "Flur");
+    await expect(node(page, "Küche")).toHaveCSS("opacity", "1");
+    expect(await left(page, "Küche")).toBe(await left(page, "EG"));
+
+    // the floor shows all its rooms again, also when it is already selected
+    await node(page, "EG").click();
+    await expect(page.locator("detailed-energy-card .path")).toHaveText("Zuhause › EG");
+    await expect(node(page, "Wohnzimmer")).toHaveCSS("opacity", "1");
+    await expect(node(page, "Küche")).toHaveCSS("opacity", "1");
+  });
+
+  test("hidden elements cannot be reached or clicked", async ({ page }) => {
+    await open(page, "focus");
+    await expect(node(page, "OG")).toHaveAttribute("aria-hidden", "true");
+    await expect(node(page, "OG")).toHaveAttribute("tabindex", "-1");
+    await expect(node(page, "OG")).toHaveCSS("pointer-events", "none");
+  });
+
+  test("without the option the selected floor stays where it is and a second click deselects it", async ({ page }) => {
+    await open(page, "floors");
+    await expect(node(page, "OG")).toHaveCSS("opacity", "1");
+    await node(page, "EG").click();
+    await expect(page.locator("detailed-energy-card .path")).toHaveText("Zuhause");
+  });
+});
+
 test("an invalid configuration shows a readable error", async ({ page }) => {
   await page.goto("/dev/index.html?scenario=invalid");
   await expect(page.locator("detailed-energy-card .error")).toContainText("area_id");

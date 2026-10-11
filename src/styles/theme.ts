@@ -191,6 +191,10 @@ export const cardStyles = css`
     margin-left: 4px;
   }
   /* nodes and consumers that draw no power are shown faded */
+  /* hidden behind the selected element (options.focus_selected): not clickable */
+  .node.ghost {
+    pointer-events: none;
+  }
   .node.idle {
     opacity: 0.45;
   }
