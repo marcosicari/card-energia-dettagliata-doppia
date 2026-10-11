@@ -23,6 +23,13 @@ const shots: Array<{ scenario: string; file: string; before?: (page: import("@pl
       await page.locator("detailed-energy-card button.node[title=Garage]").click();
     },
   },
+  {
+    scenario: "thresholds",
+    file: "card-thresholds",
+    before: async (page) => {
+      await page.locator("detailed-energy-card button.node[title=Küche]").click();
+    },
+  },
   { scenario: "floors", file: "card-all-rooms" }, // all rooms of the floor are selected by default
 ];
 

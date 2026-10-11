@@ -192,6 +192,55 @@
         invalid: { title: "Ungültig", rooms: [{ name: "ohne area_id" }] },
       };
 
+      // Own limits per level, and the oven with its own list (green until 1 kW instead of orange from 300 W).
+      scenarios.thresholds = {
+        ...scenarios.floors,
+        colors: {
+          thresholds,
+          level_thresholds: {
+            source: [
+              { from: 0, color: "#4caf50", width: 2 },
+              { from: 2000, color: "#ff9800", width: 4 },
+              { from: 6000, color: "#f44336", width: 6 },
+            ],
+            floor: [
+              { from: 0, color: "#4caf50", width: 2 },
+              { from: 1500, color: "#ff9800", width: 3.5 },
+              { from: 4000, color: "#f44336", width: 5.5 },
+            ],
+            room: [
+              { from: 0, color: "#4caf50", width: 1.5 },
+              { from: 800, color: "#ff9800", width: 3 },
+              { from: 2500, color: "#f44336", width: 5 },
+            ],
+            consumer: [
+              { from: 0, color: "#4caf50" },
+              { from: 300, color: "#ff9800" },
+              { from: 1500, color: "#f44336" },
+            ],
+          },
+        },
+        floors: scenarios.floors.floors.map((f, i) =>
+          i === 0
+            ? {
+                ...f,
+                rooms: f.rooms.map((r, j) =>
+                  j === 0
+                    ? {
+                        ...r,
+                        consumers: r.consumers.map((cn) =>
+                          cn.entity === "sensor.backofen"
+                            ? { ...cn, thresholds: [{ from: 0, color: "#4caf50" }, { from: 1000, color: "#f44336" }] }
+                            : cn,
+                        ),
+                      }
+                    : r,
+                ),
+              }
+            : f,
+        ),
+      };
+
       const params = new URLSearchParams(location.search);
       // ?width=900 lets the card grow wider than the default 480px preview column
       if (params.get("width")) document.body.style.maxWidth = params.get("width") + "px";
