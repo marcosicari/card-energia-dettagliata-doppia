@@ -329,6 +329,7 @@ Alle Farben sind anpassbar, im visuellen Editor (Bereich „Farben“) und per Y
 | **0.8.1** | Barrierefreiheit und Sprache: Schwellwert-Stufen auch über Strichstärke, lesbarer Kontrast ausgegrauter Zeilen, `aria-label` im Editor, Standardnamen der Quellen und Startkonfiguration je nach Sprache. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **0.9.0** | Schwellwerte: eigene Strichstärke je Stufe (`width`) und eigene Schwellwerte je Ebene (`colors.level_thresholds` für Quellen, Etagen, Räume, Verbraucher), Editor mit Ebenenauswahl. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **0.9.1** | Schwellwerte pro Element (Quelle, Etage, Raum, Verbraucher) und Editor-Button zum Skalieren der Grenzen. Details in [CHANGELOG.md](CHANGELOG.md) |
+| **0.9.2** | Editor: Schwellwerte und einzelne Stufen sind einklappbar. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.0** | Energie-Modus (kWh heute/Woche) mit `device_class: energy`, Stabilisierung, Aufnahme in HACS-Standard |
 
 ---
