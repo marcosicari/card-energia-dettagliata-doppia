@@ -38,6 +38,7 @@ const EN: Record<string, string> = {
   "+ Schwellwert": "+ Threshold",
   "Dieser Sensor ist bereits einem Verbraucher zugewiesen.": "This sensor is already assigned to a consumer.",
   "Mehrere Schwellwerte ab {0} W: nur einer davon gilt.": "Several thresholds from {0} W: only one of them applies.",
+  "{0} Stufen": "{0} ranges",
   "Ampel-Werte einfügen": "Insert traffic-light values",
   "Hier gelten die Werte der übergeordneten Liste.": "The values of the parent list apply here.",
   "Von der übergeordneten Liste übernehmen": "Copy from the parent list",

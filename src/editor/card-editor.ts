@@ -219,6 +219,31 @@ export class DetailedEnergyCardEditor extends LitElement {
       border-style: solid;
       color: var(--text-primary-color, #fff);
     }
+    .chip {
+      border: 1px solid var(--divider-color, #3f424d);
+      border-radius: 50%;
+      display: inline-block;
+      height: 12px;
+      margin: 0 4px;
+      vertical-align: -1px;
+      width: 12px;
+    }
+    button.title.section {
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 500;
+      padding: 8px 0;
+      text-align: left;
+      width: 100%;
+    }
+    button.title.section small {
+      color: var(--secondary-text-color);
+      font-weight: 400;
+      margin-left: 8px;
+    }
     .own-thresholds {
       margin: 4px 0 8px;
     }
@@ -379,6 +404,11 @@ export class DetailedEnergyCardEditor extends LitElement {
     this._emit(toggleFloors(cfg, false, areas, restore));
   }
 
+  /** Forgets which entries of a threshold list are open (their indices shift when one is removed). */
+  private _closeKeys(prefix: string): void {
+    this._open = new Set([...this._open].filter((k) => !(k.startsWith(`${prefix}.`) && k.endsWith(".t"))));
+  }
+
   private _toggleOpen(key: string): void {
     const open = new Set(this._open);
     open.has(key) ? open.delete(key) : open.add(key);
@@ -466,6 +496,7 @@ export class DetailedEnergyCardEditor extends LitElement {
     const set = (next: ThresholdConfig[]) =>
       this._update(owner, (obj: object) => setPath(obj ?? {}, path, next.length ? next : undefined));
     const dups = duplicateThresholds(list);
+    const prefix = [...owner, ...path.split(".")].join(".");
     const next = (): ThresholdConfig =>
       defaults[list.length] ?? { from: Math.max(100, ...list.map((t) => t.from || 0)) * 2, color: "#f44336" };
     const scale = () => {
@@ -476,17 +507,28 @@ export class DetailedEnergyCardEditor extends LitElement {
       ${list.length === 0 && fallback.length > 0
         ? html`<div class="hint">${this._tr("Hier gelten die Werte der übergeordneten Liste.")}</div>`
         : nothing}
-      ${list.map(
-        (t, i) => html`<div class="item">
+      ${list.map((t, i) => {
+        const key = `${prefix}.${i}.t`;
+        const open = this._open.has(key);
+        return html`<div class="item">
           <div class="head">
-            <span class="title">${this._tr("ab {0} W", t.from ?? 0)}</span>
+            <button class="title" aria-expanded=${open ? "true" : "false"} @click=${() => this._toggleOpen(key)}>
+              ${open ? "▾" : "▸"} <span class="chip" style=${`background:${t.color || "transparent"}`}></span>
+              ${this._tr("ab {0} W", t.from ?? 0)}${typeof t.width === "number" ? html`<small>${t.width} px</small>` : nothing}
+            </button>
             <button class="icon" title=${this._tr("Entfernen")} aria-label=${this._tr("Entfernen")}
-              @click=${() => set(removeItem(list, i))}>✕</button>
+              @click=${() => {
+                this._closeKeys(prefix);
+                set(removeItem(list, i));
+              }}>✕</button>
           </div>
-          ${this._form([...owner, ...path.split("."), i], THRESHOLD)}
-        </div>`,
-      )}
-      <button class="add" @click=${() => set([...list, next()])}>${this._tr("+ Schwellwert")}</button>
+          ${open ? this._form([...owner, ...path.split("."), i], THRESHOLD) : nothing}
+        </div>`;
+      })}
+      <button class="add" @click=${() => {
+        this._open = new Set(this._open).add(`${prefix}.${list.length}.t`);
+        set([...list, next()]);
+      }}>${this._tr("+ Schwellwert")}</button>
       ${list.length === 0
         ? html`<button class="add" @click=${() => set(defaults.map((t) => ({ ...t })))}>${this._tr("Ampel-Werte einfügen")}</button>`
         : nothing}
@@ -514,8 +556,21 @@ export class DetailedEnergyCardEditor extends LitElement {
     const c = this._config?.colors;
     const shared = c?.thresholds ?? [];
     const path = level === "all" ? "thresholds" : `level_thresholds.${level}`;
+    const key = "colors.thr";
+    const open = this._open.has(key);
+    const count = shared.length + THRESHOLD_LEVELS.reduce((n, l) => n + (c?.level_thresholds?.[l]?.length ?? 0), 0);
     return html`
-      <h4>${this._tr("Schwellwerte (Farbe nach Leistung)")}</h4>
+      <div class="own-thresholds">
+        <button class="title section" aria-expanded=${open ? "true" : "false"} @click=${() => this._toggleOpen(key)}>
+          ${open ? "▾" : "▸"} ${this._tr("Schwellwerte (Farbe nach Leistung)")}<small>${this._tr("{0} Stufen", count)}</small>
+        </button>
+      </div>
+      ${open ? this._thresholdBody(level, shared, path) : nothing}
+    `;
+  }
+
+  private _thresholdBody(level: "all" | ThresholdLevel, shared: ThresholdConfig[], path: string): TemplateResult {
+    return html`
       <div class="hint">${this._tr("Ab dem jeweiligen Wert (in W) bekommen Linien und Balken diese Farbe, darunter gilt die normale Farbe.")}</div>
       <div class="hint">${this._tr("Optional gibt eine Stufe auch die Strichstärke vor. Jede Ebene kann eigene Werte haben, sonst gelten die Werte für „Alle“.")}</div>
       <div class="levels">

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Editor: the thresholds section is collapsible and starts closed, with the number of ranges as a summary. Each range is collapsible too and shows its color, limit and line width in its header. A new range opens right away.
+
 ## 0.9.1
 
 ### Added
