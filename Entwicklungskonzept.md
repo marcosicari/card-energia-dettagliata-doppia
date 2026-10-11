@@ -330,6 +330,7 @@ Alle Farben sind anpassbar, im visuellen Editor (Bereich „Farben“) und per Y
 | **0.9.0** | Schwellwerte: eigene Strichstärke je Stufe (`width`) und eigene Schwellwerte je Ebene (`colors.level_thresholds` für Quellen, Etagen, Räume, Verbraucher), Editor mit Ebenenauswahl. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **0.9.1** | Schwellwerte pro Element (Quelle, Etage, Raum, Verbraucher) und Editor-Button zum Skalieren der Grenzen. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **0.9.2** | Editor: Schwellwerte und einzelne Stufen sind einklappbar. Details in [CHANGELOG.md](CHANGELOG.md) |
+| **0.9.3** | Raumnamen überlappen auf kleinen Displays nicht mehr, `wrap_rooms` bricht nur um, wenn eine Reihe zu schmal wäre. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.0** | Energie-Modus (kWh heute/Woche) mit `device_class: energy`, Stabilisierung, Aufnahme in HACS-Standard |
 
 ---
