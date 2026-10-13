@@ -24,6 +24,90 @@
         font-family: Roboto, system-ui, sans-serif;
         max-width: 480px;
       }
+      /* ?editor=<scenario>: the card editor in a dialog like the one of Home Assistant, next to the live card */
+      body.editor {
+        max-width: none;
+        padding: 0;
+        --primary-color: #8c96e0;
+        --text-primary-color: #14142b;
+        --divider-color: #3f424d;
+        --secondary-text-color: #b0b0b0;
+        --warning-color: #ffb74d;
+      }
+      .dlg {
+        background: #1c1c1c;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        height: 1080px;
+        width: 1000px;
+      }
+      .dlg-head {
+        align-items: center;
+        display: flex;
+        font-size: 20px;
+        gap: 22px;
+        height: 64px;
+        padding: 0 18px;
+      }
+      .dlg-tabs {
+        display: flex;
+        font-size: 14px;
+        font-weight: 500;
+        padding: 0 0 0 0;
+        width: 480px;
+      }
+      .dlg-tabs span {
+        border-bottom: 1px solid #3f424d;
+        color: #e1e1e1;
+        flex: 1;
+        padding: 14px 0;
+        text-align: center;
+      }
+      .dlg-tabs span.on {
+        border-bottom: 2px solid #8c96e0;
+        color: #8c96e0;
+      }
+      .dlg-body {
+        display: flex;
+        flex: 1;
+        gap: 20px;
+        min-height: 0;
+        padding-top: 6px;
+      }
+      .pane-l {
+        box-sizing: border-box;
+        overflow-y: auto;
+        padding-right: 8px;
+        width: 480px;
+      }
+      .pane-r {
+        background: #141414;
+        border-radius: 12px 12px 0 0;
+        flex: 1;
+        padding: 16px 18px 0 18px;
+      }
+      .dlg-foot {
+        align-items: center;
+        color: #8c96e0;
+        display: flex;
+        font-size: 14px;
+        font-weight: 500;
+        height: 76px;
+        justify-content: space-between;
+        padding: 0 22px 0 20px;
+      }
+      .dlg-foot .btns {
+        align-items: center;
+        display: flex;
+        gap: 30px;
+      }
+      .dlg-foot .save {
+        background: #3f4a8a;
+        border-radius: 20px;
+        color: #e8eaff;
+        padding: 12px 24px;
+      }
       ha-card {
         display: block;
         border-radius: 12px;
@@ -265,13 +349,45 @@
         "sensor.e_flur": 0, "sensor.e_og": 4.9, "sensor.e_keller": 2.1,
       };
 
+      // names for the entity pickers of the editor view, and the energy counters
+      const friendly = {
+        "sensor.pv": "PV Leistung",
+        "sensor.akku": "Akku Leistung",
+        "sensor.netz": "Netz Leistung",
+        "sensor.total": "Haus Leistung",
+        "sensor.backofen": "Backofen Leistung",
+        "sensor.spuel": "Spülmaschine Leistung",
+        "sensor.kuehl": "Kühlschrank Leistung",
+        "sensor.kaffee": "Kaffeemaschine Leistung",
+        "sensor.wz": "TV und Sound Leistung",
+        "sensor.flur": "Beleuchtung Flur Leistung",
+        "sensor.og": "Fußbodenheizung Leistung",
+        "sensor.keller": "Werkzeug Leistung",
+      };
+      for (const [id, name] of Object.entries(friendly)) states[id].attributes.friendly_name = name;
+      for (const [id, kwh] of Object.entries(energyToday)) {
+        const base = friendly["sensor." + id.slice("sensor.e_".length)];
+        states[id] = {
+          state: String(kwh),
+          attributes: { unit_of_measurement: "kWh", device_class: "energy", state_class: "total_increasing", friendly_name: base ? base.replace("Leistung", "Energie") : id },
+        };
+      }
+
+      // The editor view: a card for the scenario "editor" (energy sensors, thresholds, focus) in its editor.
+      scenarios.editor = {
+        ...scenarios.energy,
+        sources: scenarios.energy.sources.map((src, i) => ({ ...src, name: ["PV", "Akku", "Netz"][i] })),
+        colors: { ...scenarios.thresholds.colors, preset: "custom", accent: "#9184d9", flow: "#b5abfc", bar: "#b5abfc" },
+        options: { unit: "kW", decimals: 2, focus_selected: true, mode: "power", energy_periods: ["today", "week", "month"] },
+      };
+
       const params = new URLSearchParams(location.search);
       // ?width=900 lets the card grow wider than the default 480px preview column
       if (params.get("width")) document.body.style.maxWidth = params.get("width") + "px";
       const name = params.get("scenario") ?? "floors";
       const el = document.getElementById("c");
       el.setConfig({ type: "custom:detailed-energy-card", ...scenarios[name] });
-      el.hass = {
+      const hass = {
         language: params.get("lang") ?? "de", // ?lang=en previews the English texts
         config: { location_name: "Zuhause" },
         states,
@@ -287,6 +403,29 @@
           return m.type.includes("floor") ? registries.floors : registries.areas;
         },
       };
+      el.hass = hass;
+
+      const editorScenario = params.get("editor");
+      if (editorScenario) {
+        await import("./ha-form-stub.js");
+        document.body.classList.add("editor");
+        const dlg = document.createElement("div");
+        dlg.className = "dlg";
+        dlg.innerHTML = `
+          <div class="dlg-head"><span>✕</span><span>Energy-Karte anpassen</span></div>
+          <div class="dlg-tabs"><span class="on">Konfiguration</span><span>Sichtbarkeit</span><span>Layout</span></div>
+          <div class="dlg-body"><div class="pane-l"></div><div class="pane-r"></div></div>
+          <div class="dlg-foot"><span>Code-Editor anzeigen</span><span class="btns"><span>Abbrechen</span><span class="save">Speichern</span></span></div>`;
+        document.body.appendChild(dlg);
+        dlg.querySelector(".pane-r").appendChild(el);
+        const config = { type: "custom:detailed-energy-card", ...scenarios[editorScenario] };
+        el.setConfig(config);
+        const editor = document.createElement("detailed-energy-card-editor");
+        dlg.querySelector(".pane-l").appendChild(editor);
+        editor.hass = hass;
+        editor.setConfig(config);
+        editor.addEventListener("config-changed", (e) => el.setConfig(e.detail.config));
+      }
     </script>
   </body>
 </html>

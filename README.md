@@ -32,11 +32,15 @@ The card screenshots are rendered from mock data with `npm run screenshots`.
 
 Everything can be configured without YAML. Floors and rooms are picked from the floors and areas of your Home Assistant; the editor has a German and an English UI.
 
-| General and colors | Sources and structure |
+| General and options | Thresholds per level |
 | --- | --- |
-| ![Editor: general and colors](https://raw.githubusercontent.com/stacknoise/detailed-energy-card/main/docs/screenshots/editor-general.png) | ![Editor: sources and structure](https://raw.githubusercontent.com/stacknoise/detailed-energy-card/main/docs/screenshots/editor-structure.png) |
+| ![Editor: general](https://raw.githubusercontent.com/stacknoise/detailed-energy-card/main/docs/screenshots/editor-general.png) | ![Editor: thresholds](https://raw.githubusercontent.com/stacknoise/detailed-energy-card/main/docs/screenshots/editor-thresholds.png) |
 
-The editor screenshots are taken in a real Home Assistant.
+| Energy sensors | Structure with energy sensors |
+| --- | --- |
+| ![Editor: energy sensors](https://raw.githubusercontent.com/stacknoise/detailed-energy-card/main/docs/screenshots/editor-energy.png) | ![Editor: structure](https://raw.githubusercontent.com/stacknoise/detailed-energy-card/main/docs/screenshots/editor-structure.png) |
+
+The editor screenshots are rendered from demo data with `npm run screenshots`. The form fields are drawn by a stand-in for Home Assistant's form (`dev/ha-form-stub.js`), so they look like the real ones but are not taken in a real Home Assistant.
 
 ## Install (HACS)
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Editor: the toggle of the *Own thresholds* and the factor field of "scale limits" no longer use the browser's light default style, they follow the dark theme of Home Assistant.
+
+### Docs
+
+- New editor screenshots with demo data (general options, thresholds per level, energy sensors, structure), rendered by `npm run screenshots` from the dev page (`?editor=editor`).
+
 ## 1.0.0
 
 ### Added

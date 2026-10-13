@@ -248,6 +248,16 @@ export class DetailedEnergyCardEditor extends LitElement {
     .own-thresholds {
       margin: 4px 0 8px;
     }
+    /* the toggle of the own thresholds looks like a heading, not like a browser button */
+    .own-thresholds > button.title {
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      padding: 6px 0;
+      text-align: left;
+    }
     .scale {
       align-items: center;
       display: flex;
@@ -255,7 +265,13 @@ export class DetailedEnergyCardEditor extends LitElement {
       gap: 8px;
     }
     .scale input {
-      width: 5em;
+      background: var(--secondary-background-color, #2c2c2c);
+      border: 1px solid var(--divider-color, #3f424d);
+      border-radius: 6px;
+      color: var(--primary-text-color, inherit);
+      font: inherit;
+      padding: 6px 8px;
+      width: 4em;
     }
     button.add {
       background: none;
