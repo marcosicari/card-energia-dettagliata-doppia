@@ -9,13 +9,7 @@ const shots: Array<{ scenario: string; file: string; before?: (page: import("@pl
       await page.locator("detailed-energy-card button.node[title=Küche]").click();
     },
   },
-  {
-    scenario: "flat",
-    file: "card-without-floors",
-    before: async (page) => {
-      await page.locator("detailed-energy-card button.node[title=Küche]").click();
-    },
-  },
+  { scenario: "flat", file: "card-without-floors" }, // all rooms are selected by default
   {
     scenario: "wrap",
     file: "card-many-rooms-wrapped",
@@ -36,18 +30,45 @@ const shots: Array<{ scenario: string; file: string; before?: (page: import("@pl
     // the statistics arrive after the first render
     before: async (page) => {
       await expect(page.locator("detailed-energy-card .pill small", { hasText: "kWh" }).first()).toBeVisible();
+      await page.locator("detailed-energy-card button.node[title=Küche]").click();
     },
   },
-  { scenario: "floors", file: "card-all-rooms" }, // all rooms of the floor are selected by default
+  { scenario: "floors", file: "card-all-rooms" },
+  {
+    scenario: "floors",
+    file: "card-hero",
+    before: async (page) => {
+      await page.locator("detailed-energy-card button.node[title=Küche]").click();
+    },
+  }, // all rooms of the floor are selected by default
 ];
+
+// Every card image has the same size, so that they line up in tables and galleries. A card is shorter or longer
+// depending on its content; the picture always shows the same height and the rest is the dark background of the card.
+// card-hero keeps the height of the card (the product page uses it next to the headline).
+const CARD_IMAGE_HEIGHT = 890;
+/** a little of the page around the card, so that it reads as a card and not as a cut-out */
+const IMAGE_MARGIN = 12;
+const natural = new Set(["card-hero"]);
 
 for (const { scenario, file, before } of shots) {
   test(`screenshot ${file}`, async ({ page }) => {
+    await page.setViewportSize({ width: 512, height: CARD_IMAGE_HEIGHT + 100 });
     await page.goto(`/dev/index.html?scenario=${scenario}`);
     await expect(page.locator("detailed-energy-card .path")).toContainText("Zuhause");
     await expect(page.locator("detailed-energy-card .path")).not.toContainText("eg");
     await before?.(page);
-    await page.locator("detailed-energy-card").screenshot({ path: `docs/screenshots/${file}.png` });
+    const card = page.locator("detailed-energy-card");
+    if (natural.has(file)) {
+      await card.screenshot({ path: `docs/screenshots/${file}.png` });
+      return;
+    }
+    const box = await card.boundingBox();
+    if (!box || box.height > CARD_IMAGE_HEIGHT) throw new Error(`${file}: the card is taller than the image (${box?.height} px)`);
+    await page.screenshot({
+      path: `docs/screenshots/${file}.png`,
+      clip: { x: box.x - IMAGE_MARGIN, y: box.y - IMAGE_MARGIN, width: box.width + 2 * IMAGE_MARGIN, height: CARD_IMAGE_HEIGHT + 2 * IMAGE_MARGIN },
+    });
   });
 }
 

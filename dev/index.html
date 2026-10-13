@@ -108,6 +108,14 @@
         color: #e8eaff;
         padding: 12px 24px;
       }
+      /* like the card of Home Assistant around a transparent card: background, border and rounded corners */
+      detailed-energy-card {
+        background: var(--card-background-color);
+        border: 1px solid var(--divider-color);
+        border-radius: 12px;
+        display: block;
+        overflow: hidden;
+      }
       ha-card {
         display: block;
         border-radius: 12px;
@@ -198,6 +206,8 @@
         "sensor.buero": s(160),
         "sensor.schlafen": s(100),
         ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`sensor.r${i}`, s(100 + i * 60)])),
+        ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`sensor.r${i}b`, s(20 + i * 15)])),
+        ...Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`sensor.r${i}c`, s(i % 3 === 0 ? 0 : 8 + i * 4)])),
       };
 
       const thresholds = [
@@ -212,7 +222,7 @@
         { entity: "sensor.netz", type: "grid" },
       ];
 
-      const manyRooms = Array.from({ length: 10 }, (_, i) => room(i < 8 ? registries.areas[i].area_id : `x${i - 8}`, [c(`sensor.r${i}`, `Verbraucher ${i + 1}`)]));
+      const manyRooms = Array.from({ length: 10 }, (_, i) => room(i < 8 ? registries.areas[i].area_id : `x${i - 8}`, [c(`sensor.r${i}`, `Verbraucher ${i + 1}`), c(`sensor.r${i}b`, `Standby ${i + 1}`), c(`sensor.r${i}c`, `Beleuchtung ${i + 1}`)]));
 
       const scenarios = {
         floors: {

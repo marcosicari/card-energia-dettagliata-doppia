@@ -8,6 +8,7 @@
 
 ### Docs
 
+- All card screenshots in the README have the same size (one fixed frame, a shorter card shows the dark page below it), and the dev page draws the card like Home Assistant does (background, border, rounded corners). The README shows them in rows of two, thresholds and energy mode included.
 - New editor screenshots with demo data (general options, thresholds per level, energy sensors, structure), rendered by `npm run screenshots` from the dev page (`?editor=editor`).
 
 ## 1.0.0
