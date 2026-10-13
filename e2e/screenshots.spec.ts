@@ -30,6 +30,14 @@ const shots: Array<{ scenario: string; file: string; before?: (page: import("@pl
       await page.locator("detailed-energy-card button.node[title=Küche]").click();
     },
   },
+  {
+    scenario: "energy",
+    file: "card-energy",
+    // the statistics arrive after the first render
+    before: async (page) => {
+      await expect(page.locator("detailed-energy-card .pill small", { hasText: "kWh" }).first()).toBeVisible();
+    },
+  },
   { scenario: "floors", file: "card-all-rooms" }, // all rooms of the floor are selected by default
 ];
 

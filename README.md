@@ -22,6 +22,10 @@ Thresholds can differ per level, and a single element can have its own list. Her
 
 ![Card with thresholds per level](https://raw.githubusercontent.com/stacknoise/detailed-energy-card/main/docs/screenshots/card-thresholds.png)
 
+The energy mode shows how much each part used today, this week or this month; the lines show the share of the consumption, and the coffee machine has no energy sensor:
+
+![Card in the energy mode](https://raw.githubusercontent.com/stacknoise/detailed-energy-card/main/docs/screenshots/card-energy.png)
+
 The card screenshots are rendered from mock data with `npm run screenshots`.
 
 ### Visual editor
