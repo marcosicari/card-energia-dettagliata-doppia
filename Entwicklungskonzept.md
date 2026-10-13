@@ -342,6 +342,7 @@ Alle Farben sind anpassbar, im visuellen Editor (Bereich „Farben“) und per Y
 | **0.10.0** | Neue Option `focus_selected`: die gewählte Etage oder der gewählte Raum gleitet in die Mitte, die anderen blenden aus; ein Klick zeigt immer die Kinder. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **0.11.0** | Optionen `show_consumers` (Verbraucher-Liste ausblenden) und `only_active_consumers` (nur Verbraucher ab 1 W listen), mit Schaltern im Editor. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.0.0** | Energie-Modus (kWh heute, Woche, Monat) aus der Recorder-Statistik mit `energy_entity` und Schalter in der Karte. Details in [CHANGELOG.md](CHANGELOG.md) |
+| **1.0.1** | Editor-Stil im dunklen Theme, doppelte `energy_entity` wird abgelehnt, neue Screenshots. Details in [CHANGELOG.md](CHANGELOG.md) |
 
 ---
 
