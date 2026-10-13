@@ -202,16 +202,20 @@ function checkThresholds(value: unknown, path: string): void {
   });
 }
 
-/** A sensor may be assigned to one consumer slot only. */
+/** A sensor (power or energy) may be assigned to one consumer slot only. */
 function checkUniqueConsumers(cfg: EnergyCardConfig): void {
   const seen = new Map<string, string>();
+  const claim = (id: string, where: string) => {
+    const first = seen.get(id);
+    if (first) throw new ConfigError(`${where}: "${id}" is already assigned to ${first}; a sensor can be assigned only once`);
+    seen.set(id, where);
+  };
   const scan = (rooms: RoomConfig[] | undefined, prefix: string) =>
     (rooms ?? []).forEach((r, i) =>
       (r.consumers ?? []).forEach((c, j) => {
         const where = `${prefix}[${i}].consumers[${j}]`;
-        const first = seen.get(c.entity);
-        if (first) throw new ConfigError(`${where}: "${c.entity}" is already assigned to ${first}; a sensor can be assigned only once`);
-        seen.set(c.entity, where);
+        claim(c.entity, where);
+        if (c.energy_entity) claim(c.energy_entity, `${where}.energy_entity`);
       }),
     );
   scan(cfg.rooms, "rooms");

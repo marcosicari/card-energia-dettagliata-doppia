@@ -183,6 +183,15 @@ describe("consumers are unique", () => {
     const [entity] = consumerFields(["sensor.two"]);
     expect(entity.selector).toEqual({ entity: { domain: "sensor", device_class: "power", exclude_entities: ["sensor.two"] } });
   });
+  it("rejects an energy sensor that is assigned twice", () => {
+    const cfg = (a: string, b: string) => () =>
+      validateConfig({
+        type: "x",
+        rooms: [{ area_id: "a", consumers: [{ entity: "sensor.p1", energy_entity: a }, { entity: "sensor.p2", energy_entity: b }] }],
+      });
+    expect(cfg("sensor.e1", "sensor.e1")).toThrow(/consumers\[1\]\.energy_entity.*already assigned to rooms\[0\]\.consumers\[0\]\.energy_entity/);
+    expect(cfg("sensor.e1", "sensor.e2")).not.toThrow();
+  });
   it("rejects a sensor that is assigned twice, across rooms and floors", () => {
     const dup = (rooms: unknown, floors?: unknown) => () => validateConfig({ type: "x", rooms, floors });
     expect(dup([{ area_id: "a", consumers: [{ entity: "sensor.x" }, { entity: "sensor.x" }] }])).toThrow(ConfigError);

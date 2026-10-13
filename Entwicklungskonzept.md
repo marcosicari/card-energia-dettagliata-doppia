@@ -48,10 +48,12 @@ type: custom:detailed-energy-card
 title: Energiefluss
 home:
   total_entity: sensor.hausverbrauch_power   # optional, für "Nicht erfasst"
+  total_energy_entity: sensor.hausverbrauch_energie   # optional, Zähler (kWh) für den Energie-Modus
 sources:
   - entity: sensor.pv_leistung
     name: PV
     type: solar            # solar | battery | grid | generic
+    energy_entity: sensor.pv_energie   # optional, Zähler (kWh) für den Energie-Modus
     color: "#f2c94c"       # optional, eigene Farbe je Quelle
   - entity: sensor.akku_leistung
     name: Batterie
@@ -69,6 +71,7 @@ floors:                    # optional – weglassen = Räume direkt am Zuhause
         consumers:
           - entity: sensor.backofen_power
             name: Backofen      # optional, sonst friendly_name
+            energy_entity: sensor.backofen_energie   # optional, Energie-Modus
           - entity: sensor.kuehlschrank_power
 rooms: []                  # alternativ zu floors (Wohnung ohne Etagen)
 colors:                    # optional – leer = HA-Theme
@@ -95,6 +98,8 @@ options:
   show_consumers: true        # false: Verbraucher-Liste ausblenden
   only_active_consumers: false # true: nur Verbraucher ab 1 W listen
   remember_selection: true
+  mode: power                 # power | energy (Startansicht, Energie-Modus siehe Abschnitt 15)
+  energy_periods: [today, week, month]   # optional, Zeiträume des Schalters (Standard alle)
 ```
 
 **Regeln**

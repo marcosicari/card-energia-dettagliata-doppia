@@ -5,9 +5,11 @@
 ### Fixed
 
 - Editor: the toggle of the *Own thresholds* and the factor field of "scale limits" no longer use the browser's light default style, they follow the dark theme of Home Assistant.
+- An `energy_entity` of a consumer can no longer be assigned twice (validation error, like `entity`).
 
 ### Docs
 
+- `Entwicklungskonzept.md`: the YAML overview (section 3) lists the energy options (`energy_entity`, `home.total_energy_entity`, `options.mode`, `options.energy_periods`).
 - All card screenshots in the README have the same size (one fixed frame, a shorter card shows the dark page below it), and the dev page draws the card like Home Assistant does (background, border, rounded corners). The README shows them in rows of two, thresholds and energy mode included.
 - New editor screenshots with demo data (general options, thresholds per level, energy sensors, structure), rendered by `npm run screenshots` from the dev page (`?editor=editor`).
 
