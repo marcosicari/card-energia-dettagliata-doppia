@@ -244,6 +244,27 @@
       // The selected floor or room slides to the middle, the others fade out (options.focus_selected).
       scenarios.focus = { ...scenarios.floors, options: { unit: "kW", focus_selected: true } };
 
+      // Energy mode: the same house with energy counters. The coffee machine has no energy sensor on purpose.
+      const energyId = (id) => "sensor.e_" + id.slice("sensor.".length);
+      const withEnergy = (rooms) =>
+        rooms.map((r) => ({
+          ...r,
+          consumers: r.consumers.map((cn) => (cn.entity === "sensor.kaffee" ? cn : { ...cn, energy_entity: energyId(cn.entity) })),
+        }));
+      scenarios.energy = {
+        ...scenarios.floors,
+        home: { ...scenarios.floors.home, total_energy_entity: "sensor.e_total" },
+        sources: scenarios.floors.sources.map((src) => ({ ...src, energy_entity: energyId(src.entity) })),
+        floors: scenarios.floors.floors.map((f) => ({ ...f, rooms: withEnergy(f.rooms) })),
+        options: { unit: "kW", mode: "energy" },
+      };
+      // kWh of "today"; longer periods are a multiple of it
+      const energyToday = {
+        "sensor.e_pv": 12.4, "sensor.e_akku": 2.0, "sensor.e_netz": 5.1, "sensor.e_total": 19.5,
+        "sensor.e_backofen": 4.2, "sensor.e_spuel": 2.6, "sensor.e_kuehl": 1.9, "sensor.e_wz": 3.1,
+        "sensor.e_flur": 0, "sensor.e_og": 4.9, "sensor.e_keller": 2.1,
+      };
+
       const params = new URLSearchParams(location.search);
       // ?width=900 lets the card grow wider than the default 480px preview column
       if (params.get("width")) document.body.style.maxWidth = params.get("width") + "px";
@@ -254,7 +275,17 @@
         language: params.get("lang") ?? "de", // ?lang=en previews the English texts
         config: { location_name: "Zuhause" },
         states,
-        callWS: async (m) => (m.type.includes("floor") ? registries.floors : registries.areas),
+        callWS: async (m) => {
+          if (m.type === "recorder/statistics_during_period") {
+            if (params.get("energyError")) throw new Error("no statistics");
+            const days = (Date.parse(m.end_time) - Date.parse(m.start_time)) / 86400000;
+            const factor = m.period === "hour" ? 1 : Math.min(30, Math.max(2, Math.round(days)));
+            return Object.fromEntries(
+              m.statistic_ids.filter((id) => id in energyToday).map((id) => [id, [{ change: energyToday[id] * factor }]]),
+            );
+          }
+          return m.type.includes("floor") ? registries.floors : registries.areas;
+        },
       };
     </script>
   </body>

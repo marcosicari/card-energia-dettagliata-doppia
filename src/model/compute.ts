@@ -10,8 +10,11 @@ export type Reader = (entityId: string) => Reading;
 export interface ConsumerNode {
   entity: string;
   name?: string;
+  /** watts, or watt hours in the energy mode */
   watts: number;
   valid: boolean;
+  /** energy mode: the consumer has no energy sensor */
+  noEnergy?: boolean;
   /** own thresholds from the config, replace the level thresholds */
   thresholds?: ThresholdConfig[];
 }
@@ -47,9 +50,11 @@ export interface SourceNode {
   icon?: string;
   color?: string;
   thresholds?: ThresholdConfig[];
-  /** signed watts after `invert`; solar/generic are clipped at 0 */
+  /** signed watts after `invert`; solar/generic are clipped at 0 (watt hours in the energy mode) */
   watts: number;
   valid: boolean;
+  /** energy mode: the source has no energy sensor */
+  noEnergy?: boolean;
   /** true while the source consumes power (battery charging, grid export) */
   reverse: boolean;
   /** share of all producing sources, 0..1 */
@@ -76,10 +81,13 @@ const DEFAULT_NAMES: Record<SourceType, string> = {
   generic: "Quelle",
 };
 
-function computeRoom(room: RoomConfig, read: Reader): RoomNode {
-  const consumers = (room.consumers ?? []).map((c) => {
-    const r = read(c.entity);
-    return { entity: c.entity, name: c.name, watts: r.valid ? Math.max(0, r.watts) : 0, valid: r.valid, thresholds: c.thresholds };
+const MISSING: Reading = { watts: 0, valid: false };
+
+function computeRoom(room: RoomConfig, read: Reader, energy: boolean): RoomNode {
+  const consumers = (room.consumers ?? []).map((c): ConsumerNode => {
+    const noEnergy = energy && !c.energy_entity;
+    const r = noEnergy ? MISSING : read(energy ? c.energy_entity! : c.entity);
+    return { entity: c.entity, name: c.name, watts: r.valid ? Math.max(0, r.watts) : 0, valid: r.valid, noEnergy: noEnergy || undefined, thresholds: c.thresholds };
   });
   return {
     id: room.area_id,
@@ -95,18 +103,23 @@ function computeRoom(room: RoomConfig, read: Reader): RoomNode {
 /**
  * `read` reads power sensors; `readSoc` reads state-of-charge sensors in percent
  * (defaults to `read`, which is enough for tests that use one lookup table).
+ * With `energy` the model is built from the energy sensors instead (`read` then returns watt hours of
+ * the period): elements without an energy sensor count 0 and are marked invalid.
  */
 export function computeModel(
   cfg: EnergyCardConfig,
   read: Reader,
   readSoc: Reader = read,
   names: Record<SourceType, string> = DEFAULT_NAMES,
+  energy = false,
 ): EnergyModel {
   const sources: SourceNode[] = (cfg.sources ?? []).map((s) => {
     const type = s.type ?? "generic";
-    const r = read(s.entity);
+    const noEnergy = energy && !s.energy_entity;
+    const r = noEnergy ? MISSING : read(energy ? s.energy_entity! : s.entity);
     let watts = r.valid ? r.watts : 0;
-    if (s.invert) watts = -watts;
+    // an energy counter only counts what the source delivers
+    if (s.invert && !energy) watts = -watts;
     if (type === "solar" || type === "generic") watts = Math.max(0, watts);
     const soc = s.soc_entity ? readSoc(s.soc_entity) : undefined;
     return {
@@ -118,6 +131,7 @@ export function computeModel(
       thresholds: s.thresholds,
       watts,
       valid: r.valid,
+      noEnergy: noEnergy || undefined,
       reverse: watts < 0,
       share: 0,
       soc: soc?.valid ? soc.watts : undefined,
@@ -128,16 +142,17 @@ export function computeModel(
   for (const s of sources) s.share = produced > 0 ? Math.max(0, s.watts) / produced : 0;
 
   const floors: FloorNode[] = (cfg.floors ?? []).map((f) => {
-    const rooms = (f.rooms ?? []).map((r) => computeRoom(r, read));
+    const rooms = (f.rooms ?? []).map((r) => computeRoom(r, read, energy));
     return { id: f.floor_id, name: f.name ?? f.floor_id, icon: f.icon, color: f.color, thresholds: f.thresholds, watts: rooms.reduce((s, r) => s + r.watts, 0), rooms };
   });
-  const rooms = (cfg.rooms ?? []).map((r) => computeRoom(r, read));
+  const rooms = (cfg.rooms ?? []).map((r) => computeRoom(r, read, energy));
 
   const roomSum = floors.length
     ? floors.reduce((s, f) => s + f.watts, 0)
     : rooms.reduce((s, r) => s + r.watts, 0);
 
-  const total = cfg.home?.total_entity ? read(cfg.home.total_entity) : undefined;
+  const totalId = energy ? cfg.home?.total_energy_entity : cfg.home?.total_entity;
+  const total = totalId ? read(totalId) : undefined;
   const totalValid = !!total?.valid;
   const homeWatts = totalValid ? Math.max(0, total!.watts) : roomSum;
   const unassigned = totalValid ? Math.max(0, homeWatts - roomSum) : 0;

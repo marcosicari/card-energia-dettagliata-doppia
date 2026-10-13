@@ -74,6 +74,26 @@ The *Self-sufficiency* badge (share of the consumption not drawn from the grid) 
 
 **Negative values:** a consumer that reports a negative value (for example a bidirectional meter) counts as 0 W; only sources can be negative (battery charging, grid feed-in), solar and generic sources are clamped at 0. If a consumer feeds back and you want to see it, add that sensor as a source instead.
 
+**Energy mode (kWh):** besides the power now the card can show how much energy each part used today, this week or this month. Give sources and consumers an `energy_entity` (a `sensor.*` energy counter with `device_class: energy`, in Wh, kWh or MWh) next to their power `entity`, and optionally `home.total_energy_entity` for "Unassigned" and the self-sufficiency badge. A switch *Now | Today | Week | Month* appears in the card once one element has an energy sensor. The values come from the long-term statistics of Home Assistant (the sensors need a `state_class` of `total` or `total_increasing`, and the recorder must keep them); the card needs no `utility_meter` helpers. Day, week and month start at midnight in the time zone of Home Assistant, the week on the first weekday of your locale. Lines show the share of the home's consumption instead of a flow, there are no thresholds and no animation in this mode. An element without `energy_entity` is shown as unavailable ("No energy sensor configured"). Feed-in and battery charging are not shown in the energy mode, because an energy counter only counts in one direction: enter the import counter of the grid, not the export counter. Options: `options.mode` (`power` or `energy`, what the card shows when it loads) and `options.energy_periods` (a list of `today`, `week`, `month` the switch offers; default all).
+
+```yaml
+home:
+  total_entity: sensor.house_power
+  total_energy_entity: sensor.house_energy
+sources:
+  - { entity: sensor.pv_power, energy_entity: sensor.pv_energy, type: solar }
+  - { entity: sensor.grid_power, energy_entity: sensor.grid_import_energy, type: grid }
+floors:
+  - floor_id: ground_floor
+    rooms:
+      - area_id: kitchen
+        consumers:
+          - { entity: sensor.oven_power, energy_entity: sensor.oven_energy }
+options:
+  mode: energy
+  energy_periods: [today, week]
+```
+
 **Idle and thresholds:** consumers that draw no power (under 1 W) are shown faded in the list, and rooms and floors without consumption are faded in the diagram. To color lines and list bars by power, add thresholds (in watts); from each `from` value upwards the color applies, below the first one the normal color is used:
 
 ```yaml

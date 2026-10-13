@@ -11,6 +11,8 @@ export interface SourceConfig {
   color?: string;
   soc_entity?: string;
   invert?: boolean;
+  /** energy counter (kWh) for the energy mode */
+  energy_entity?: string;
   /** own thresholds for the line of this source (replace the level thresholds) */
   thresholds?: ThresholdConfig[];
 }
@@ -18,6 +20,8 @@ export interface SourceConfig {
 export interface ConsumerConfig {
   entity: string;
   name?: string;
+  /** energy counter (kWh) for the energy mode */
+  energy_entity?: string;
   /** own thresholds for the bar of this consumer */
   thresholds?: ThresholdConfig[];
 }
@@ -73,12 +77,16 @@ export interface OptionsConfig {
   wrap_rooms?: boolean;
   /** the selected floor / room slides to the middle under its parent, the others of its level fade out */
   focus_selected?: boolean;
+  /** what the card shows when it loads: the power now, or the energy of a period (default power) */
+  mode?: "power" | "energy";
+  /** periods the switch offers in the energy mode (default all) */
+  energy_periods?: Array<"today" | "week" | "month">;
 }
 
 export interface EnergyCardConfig {
   type: string;
   title?: string;
-  home?: { total_entity?: string };
+  home?: { total_entity?: string; total_energy_entity?: string };
   sources?: SourceConfig[];
   floors?: FloorConfig[];
   rooms?: RoomConfig[];
@@ -124,11 +132,15 @@ function checkRoom(room: unknown, where: string): void {
   checkThresholds(room.thresholds, `${where}.thresholds`);
   list(room.consumers, `${where}.consumers`).forEach((c, i) => {
     checkEntity(isObj(c) ? c.entity : undefined, `${where}.consumers[${i}]`);
+    if (isObj(c) && c.energy_entity) checkEntity(c.energy_entity, `${where}.consumers[${i}].energy_entity`);
     if (isObj(c)) checkThresholds(c.thresholds, `${where}.consumers[${i}].thresholds`);
   });
 }
 
 const UNITS = ["auto", "W", "kW"];
+const MODES = ["power", "energy"];
+export const ENERGY_PERIODS = ["today", "week", "month"] as const;
+export type EnergyPeriod = (typeof ENERGY_PERIODS)[number];
 /** Decimal places: Intl.NumberFormat accepts 0..20 everywhere; the editor offers 0..4. */
 export const MAX_DECIMALS = 20;
 const COLOR_KEYS = ["accent", "flow", "inactive", "bar", "background", "text"] as const;
@@ -144,6 +156,14 @@ function checkOptions(options: unknown): void {
   if (d !== undefined && (typeof d !== "number" || !Number.isInteger(d) || d < 0 || d > MAX_DECIMALS)) {
     throw new ConfigError(`options.decimals must be a whole number from 0 to ${MAX_DECIMALS}`);
   }
+  if (options.mode !== undefined && !MODES.includes(options.mode as string)) {
+    throw new ConfigError(`options.mode: "${String(options.mode)}" must be one of ${MODES.join(", ")}`);
+  }
+  list(options.energy_periods, "options.energy_periods").forEach((p, i) => {
+    if (!(ENERGY_PERIODS as readonly unknown[]).includes(p)) {
+      throw new ConfigError(`options.energy_periods[${i}]: "${String(p)}" must be one of ${ENERGY_PERIODS.join(", ")}`);
+    }
+  });
   for (const key of ["animation", "show_unassigned", "show_consumers", "only_active_consumers", "remember_selection", "wrap_rooms", "focus_selected"]) {
     checkBool(options[key], `options.${key}`);
   }
@@ -213,11 +233,13 @@ export function validateConfig(raw: unknown): EnergyCardConfig {
   if (raw.home !== undefined && raw.home !== null) {
     if (!isObj(raw.home)) throw new ConfigError("home must be a mapping");
     if (raw.home.total_entity) checkEntity(raw.home.total_entity, "home.total_entity");
+    if (raw.home.total_energy_entity) checkEntity(raw.home.total_energy_entity, "home.total_energy_entity");
   }
 
   sources.forEach((s, i) => {
     if (!isObj(s)) throw new ConfigError(`sources[${i}] must be a mapping with an entity`);
     checkEntity(s.entity, `sources[${i}].entity`);
+    if (s.energy_entity) checkEntity(s.energy_entity, `sources[${i}].energy_entity`);
     if (s.type && !SOURCE_TYPES.includes(s.type as SourceType)) {
       throw new ConfigError(`sources[${i}].type: unknown type "${String(s.type)}"`);
     }
@@ -255,5 +277,25 @@ export function collectEntityIds(cfg: EnergyCardConfig): string[] {
   }
   const rooms = [...(cfg.rooms ?? []), ...(cfg.floors ?? []).flatMap((f) => f.rooms ?? [])];
   for (const r of rooms) for (const c of r.consumers ?? []) ids.add(c.entity);
+  return [...ids];
+}
+
+/** True when at least one element has an energy sensor, so the card can offer the energy mode. */
+export function hasEnergy(cfg: EnergyCardConfig): boolean {
+  const rooms = [...(cfg.rooms ?? []), ...(cfg.floors ?? []).flatMap((f) => f.rooms ?? [])];
+  return (
+    !!cfg.home?.total_energy_entity ||
+    (cfg.sources ?? []).some((s) => !!s.energy_entity) ||
+    rooms.some((r) => (r.consumers ?? []).some((c) => !!c.energy_entity))
+  );
+}
+
+/** All energy sensors of the config (their statistics are requested together). */
+export function collectEnergyIds(cfg: EnergyCardConfig): string[] {
+  const ids = new Set<string>();
+  if (cfg.home?.total_energy_entity) ids.add(cfg.home.total_energy_entity);
+  for (const s of cfg.sources ?? []) if (s.energy_entity) ids.add(s.energy_entity);
+  const rooms = [...(cfg.rooms ?? []), ...(cfg.floors ?? []).flatMap((f) => f.rooms ?? [])];
+  for (const r of rooms) for (const c of r.consumers ?? []) if (c.energy_entity) ids.add(c.energy_entity);
   return [...ids];
 }

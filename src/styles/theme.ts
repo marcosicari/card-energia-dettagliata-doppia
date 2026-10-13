@@ -63,6 +63,36 @@ export const cardStyles = css`
     font-size: 1.3em;
     font-weight: 600;
   }
+  .modes {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0 0 8px;
+  }
+  .modes button {
+    background: none;
+    border: 1px solid var(--_line);
+    border-radius: 8px;
+    color: var(--_muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85em;
+    padding: 4px 12px;
+  }
+  .modes button.on {
+    background: color-mix(in srgb, var(--_accent) 25%, transparent);
+    border-color: var(--_accent);
+    color: var(--_text);
+  }
+  .modes .status {
+    color: var(--_muted);
+    font-size: 0.8em;
+    margin-left: 8px;
+  }
+  .modes .status.warn {
+    color: var(--warning-color, #ffb74d);
+  }
   .path {
     color: var(--_muted);
     font-size: 0.9em;

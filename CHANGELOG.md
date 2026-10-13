@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Energy mode: the card can show the energy of today, this week or this month in kWh. Give sources and consumers an `energy_entity` (and optionally `home.total_energy_entity`); a switch *Now | Today | Week | Month* appears. The values come from the long-term statistics of Home Assistant, no `utility_meter` helpers needed. Lines show the share of the consumption instead of a flow; elements without an energy sensor are shown as unavailable.
+- `options.mode` (`power` or `energy`, the view the card starts with) and `options.energy_periods` (which periods the switch offers). The view and period are remembered like the selection.
+- Editor: fields for the energy sensors (checked for `device_class: energy` and a Wh / kWh / MWh unit), the start view and the periods.
+
 ## 0.11.0
 
 ### Added

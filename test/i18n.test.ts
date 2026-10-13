@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { editorKeys, makeTr } from "../src/localize/editor";
-import { COLORS, CONSUMER, GENERAL, HOME, PALETTE, SOURCE, THRESHOLD, floorFields, roomFields } from "../src/editor/schema";
+import { COLORS, CONSUMER, ENERGY_MODE, GENERAL, HOME, PALETTE, SOURCE, THRESHOLD, floorFields, roomFields } from "../src/editor/schema";
 import { checkSensor, contrastWarning } from "../src/editor/validation";
 import { sourceNames } from "../src/localize";
 import { computeModel } from "../src/model/compute";
@@ -11,7 +11,7 @@ describe("editor translations", () => {
   const keys = new Set(editorKeys());
 
   it("translates every field label and palette entry", () => {
-    const labels = [...GENERAL, ...COLORS, ...HOME, ...THRESHOLD, ...SOURCE, ...floorFields(), ...roomFields(), ...CONSUMER].map((f) => f.label);
+    const labels = [...GENERAL, ...ENERGY_MODE, ...COLORS, ...HOME, ...THRESHOLD, ...SOURCE, ...floorFields(), ...roomFields(), ...CONSUMER].map((f) => f.label);
     const missing = [...labels, ...PALETTE.map((c) => c.label)].filter((l) => l && l !== "Theme" && !keys.has(l));
     expect(missing).toEqual([]);
   });

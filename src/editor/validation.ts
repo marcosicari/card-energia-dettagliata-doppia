@@ -11,6 +11,7 @@ export { isValidColor };
 const DE = makeTr("de");
 
 const POWER_UNITS = ["W", "kW", "MW"];
+const ENERGY_UNITS = ["Wh", "kWh", "MWh"];
 
 /** Message for an unsuitable sensor, undefined when the sensor is fine or not set yet. */
 export function checkSensor(
@@ -27,6 +28,9 @@ export function checkSensor(
   if (check === "power") {
     if (attrs.device_class !== "power") return tr("Kein Leistungssensor (device_class: power)");
     if (!POWER_UNITS.includes(String(attrs.unit_of_measurement))) return tr("Einheit muss W, kW oder MW sein");
+  } else if (check === "energy") {
+    if (attrs.device_class !== "energy") return tr("Kein Energiesensor (device_class: energy)");
+    if (!ENERGY_UNITS.includes(String(attrs.unit_of_measurement))) return tr("Einheit muss Wh, kWh oder MWh sein");
   } else if (attrs.device_class !== "battery" && attrs.unit_of_measurement !== "%") {
     return tr("Kein Prozent-/Batteriesensor");
   }

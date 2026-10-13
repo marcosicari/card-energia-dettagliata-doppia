@@ -2,9 +2,10 @@ import { LitElement, html, nothing, svg, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 import { cardStyles, colorVars } from "./styles/theme";
-import { collectEntityIds, validateConfig, type EnergyCardConfig } from "./model/config";
+import { collectEnergyIds, collectEntityIds, hasEnergy, validateConfig, type EnergyCardConfig } from "./model/config";
+import { energyReader, firstWeekdayIndex, loadEnergy, offeredPeriods, type EnergyPeriod } from "./model/energy";
 import { computeModel, listedConsumers, type EnergyModel, type RoomNode, type SourceNode } from "./model/compute";
-import { formatPower, type StateLike } from "./model/units";
+import { formatEnergy, formatPower, type StateLike } from "./model/units";
 import { powerReader, socReader } from "./model/readers";
 import { elementThresholds, isIdle, resolveThresholds, thresholdColor, thresholdLevel, thresholdWidth, type ThresholdConfig, type ThresholdLevel } from "./model/thresholds";
 import { localize, sourceNames, type Key } from "./localize";
@@ -28,11 +29,11 @@ import {
 
 interface Hass {
   language?: string;
-  locale?: { language?: string };
-  config?: { location_name?: string };
+  locale?: { language?: string; first_weekday?: string };
+  config?: { location_name?: string; time_zone?: string };
   areas?: Record<string, AreaEntry | undefined>;
   floors?: Record<string, FloorEntry | undefined>;
-  callWS<T>(msg: { type: string }): Promise<T>;
+  callWS<T>(msg: Record<string, unknown>): Promise<T>;
   states: Record<string, StateLike | undefined>;
 }
 
@@ -40,6 +41,8 @@ interface Hass {
 const MAX_LEVEL = 3;
 /** Room columns narrower than this get a smaller label font, so that more of the name stays readable. */
 const TIGHT_COL_W = 90;
+/** How often the energy of the period is asked for again. */
+const ENERGY_REFRESH_MS = 5 * 60_000;
 
 /** A room with where it is shown; rooms of a floor that was just left are still drawn while they fade out. */
 interface RoomView {
@@ -65,6 +68,14 @@ export class DetailedEnergyCard extends LitElement {
   @state() private _error?: string;
   @state() private _width = 0;
   @state() private _sel: Selection = {};
+  /** "power": the power now; "energy": the energy of a period (needs energy sensors) */
+  @state() private _mode: "power" | "energy" = "power";
+  @state() private _period: EnergyPeriod = "today";
+  /** watt hours of the period per energy sensor; undefined until the first answer */
+  @state() private _energy?: Map<string, number>;
+  @state() private _energyState: "idle" | "loading" | "ok" | "error" = "idle";
+  private _energyTimer = 0;
+  private _energyToken = 0;
 
   private _hass?: Hass;
   private _entityIds: string[] = [];
@@ -102,6 +113,8 @@ export class DetailedEnergyCard extends LitElement {
       this._thresholds = resolveThresholds(this._config.colors?.thresholds, this._config.colors?.level_thresholds);
       this._resolved = undefined;
       this._sel = this._loadSelection();
+      this._loadMode();
+      this._ensureEnergy();
     } catch (e) {
       this._error = (e as Error).message;
       this._config = undefined;
@@ -123,6 +136,7 @@ export class DetailedEnergyCard extends LitElement {
     if (old && !registryChanged && !displayChanged && this._entityIds.every((id) => old.states[id] === hass.states[id])) return;
     this._recompute();
     this.requestUpdate();
+    this._ensureEnergy();
   }
 
   getCardSize(): number {
@@ -154,6 +168,8 @@ export class DetailedEnergyCard extends LitElement {
     this._io?.disconnect();
     this._io = undefined;
     cancelAnimationFrame(this._raf);
+    clearTimeout(this._energyTimer);
+    this._energyToken++;
     this._tween = undefined;
     this.classList.remove("offscreen");
     this._observed = undefined;
@@ -180,7 +196,15 @@ export class DetailedEnergyCard extends LitElement {
       if (this._resolved?.reg !== reg) this._resolved = { reg, cfg: resolveNames(this._config, reg) };
       cfg = this._resolved.cfg;
     }
-    this._model = computeModel(cfg, powerReader(states), socReader(states), sourceNames(this._hass.locale?.language ?? this._hass.language));
+    const names = sourceNames(this._hass.locale?.language ?? this._hass.language);
+    if (this._mode === "energy") {
+      // while the first answer is on its way everything counts 0 instead of showing warnings; after an error nothing is known
+      const ids = collectEnergyIds(cfg);
+      const values = this._energy ?? (this._energyState === "error" ? new Map<string, number>() : new Map(ids.map((id) => [id, 0] as const)));
+      this._model = computeModel(cfg, energyReader(values), socReader(states), names, true);
+    } else {
+      this._model = computeModel(cfg, powerReader(states), socReader(states), names);
+    }
   }
 
   private get _storageKey(): string {
@@ -226,6 +250,117 @@ export class DetailedEnergyCard extends LitElement {
     return { floor, rooms, room };
   }
 
+  // ---------- energy mode ----------
+
+  private get _modeKey(): string {
+    return `${this._storageKey}:mode`;
+  }
+
+  /** Mode and period: the remembered ones, else the configured mode and the first period offered. */
+  private _loadMode(): void {
+    const cfg = this._config;
+    const periods = offeredPeriods(cfg?.options?.energy_periods);
+    let mode: "power" | "energy" = cfg?.options?.mode === "energy" ? "energy" : "power";
+    let period: EnergyPeriod = periods[0];
+    if (cfg?.options?.remember_selection !== false) {
+      try {
+        const v = JSON.parse(localStorage.getItem(this._modeKey) ?? "null") as { mode?: unknown; period?: unknown } | null;
+        if (v?.mode === "power" || v?.mode === "energy") mode = v.mode;
+        if (periods.includes(v?.period as EnergyPeriod)) period = v!.period as EnergyPeriod;
+      } catch {
+        /* storage may be unavailable or hold something else */
+      }
+    }
+    if (!cfg || !hasEnergy(cfg)) mode = "power";
+    this._mode = mode;
+    this._period = period;
+    this._energy = undefined;
+    this._energyState = "idle";
+    clearTimeout(this._energyTimer);
+    this._energyToken++;
+  }
+
+  private _setView(mode: "power" | "energy", period: EnergyPeriod): void {
+    const changed = mode !== this._mode || period !== this._period;
+    this._mode = mode;
+    this._period = period;
+    if (this._config?.options?.remember_selection !== false) {
+      try {
+        localStorage.setItem(this._modeKey, JSON.stringify({ mode, period }));
+      } catch {
+        /* storage may be unavailable */
+      }
+    }
+    if (!changed) return;
+    clearTimeout(this._energyTimer);
+    this._energyToken++;
+    // the numbers of another period would be wrong for this one
+    this._energy = undefined;
+    if (mode === "energy") {
+      this._energyState = "idle";
+      this._ensureEnergy(true);
+    }
+    this._recompute();
+  }
+
+  /** Loads the energy of the period when the energy mode needs it. */
+  private _ensureEnergy(force = false): void {
+    if (this._mode !== "energy" || !this._config || !this._hass) return;
+    if (!force && this._energyState !== "idle") return;
+    void this._fetchEnergy();
+  }
+
+  private async _fetchEnergy(): Promise<void> {
+    const cfg = this._config;
+    const hass = this._hass;
+    if (!cfg || !hass || this._mode !== "energy") return;
+    const token = ++this._energyToken;
+    clearTimeout(this._energyTimer);
+    // an answer for the period that was shown stays visible while the new one is loading
+    if (this._energyState !== "ok") this._energyState = "loading";
+    try {
+      const values = await loadEnergy(
+        hass,
+        collectEnergyIds(cfg),
+        this._period,
+        new Date(),
+        hass.config?.time_zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+        firstWeekdayIndex(hass.locale?.first_weekday),
+      );
+      if (token !== this._energyToken) return;
+      this._energy = values;
+      this._energyState = "ok";
+    } catch {
+      if (token !== this._energyToken) return;
+      this._energy = undefined;
+      this._energyState = "error";
+    }
+    this._recompute();
+    // the statistics are compiled every few minutes: ask again from time to time
+    this._energyTimer = window.setTimeout(() => {
+      if (this.classList.contains("offscreen")) this._energyState = "idle";
+      else void this._fetchEnergy();
+    }, ENERGY_REFRESH_MS);
+  }
+
+  private _renderModeSwitch(cfg: EnergyCardConfig): TemplateResult | typeof nothing {
+    if (!hasEnergy(cfg)) return nothing;
+    const periods = offeredPeriods(cfg.options?.energy_periods);
+    const items: Array<{ mode: "power" | "energy"; period: EnergyPeriod; label: string; on: boolean }> = [
+      { mode: "power", period: this._period, label: this._t("mode_now"), on: this._mode === "power" },
+      ...periods.map((p) => ({ mode: "energy" as const, period: p, label: this._t(`period_${p}`), on: this._mode === "energy" && this._period === p })),
+    ];
+    return html`
+      <div class="modes" role="group" aria-label=${this._t("period_label")}>
+        ${items.map(
+          (i) => html`<button class=${i.on ? "on" : ""} aria-pressed=${i.on} @click=${() => this._setView(i.mode, i.period)}>${i.label}</button>`,
+        )}
+        ${this._mode === "energy" && this._energyState === "loading" ? html`<span class="status">${this._t("energy_loading")}</span>` : nothing}
+        ${this._mode === "energy" && this._energyState === "error" ? html`<span class="status warn">${this._t("energy_error")}</span>` : nothing}
+      </div>
+    `;
+  }
+
   // ---------- helpers ----------
 
   private _t(key: Key): string {
@@ -234,6 +369,7 @@ export class DetailedEnergyCard extends LitElement {
 
   private _fmt(watts: number): string {
     const o = this._config?.options;
+    if (this._mode === "energy") return formatEnergy(watts, o?.decimals ?? 1, this._hass?.locale?.language ?? this._hass?.language);
     return formatPower(watts, o?.unit ?? "W", o?.decimals ?? 2, this._hass?.locale?.language ?? this._hass?.language);
   }
 
@@ -347,6 +483,7 @@ export class DetailedEnergyCard extends LitElement {
             ? html`<div class="badge">${this._t("autarky")} ${Math.round(model.autarky * 100)} %</div>`
             : nothing}
         </header>
+        ${this._renderModeSwitch(cfg)}
         <div class="scroll">
           <div class="graph" style=${styleMap({ width: `${layout.width}px`, height: `${layout.height}px` })}>
             ${this._renderLines(model, layout, floorViews, roomViews, sel.floor, sel.room, allRooms, allFloors)}
@@ -362,17 +499,21 @@ export class DetailedEnergyCard extends LitElement {
   }
 
   private _renderLines(model: EnergyModel, l: Layout, floorViews: Pos[], roomViews: RoomView[], floorIdx?: number, roomIdx?: number, allRooms = false, allFloors = false): TemplateResult {
-    const animate = this._config?.options?.animation !== false;
+    const energy = this._mode === "energy";
+    const animate = this._config?.options?.animation !== false && !energy;
     const thresholds = this._thresholds;
+    // energy mode: the width shows the share of the consumption of the home (or of all sources), no thresholds
+    const shareOf = (v: number, total: number) => 1 + Math.min(1, Math.max(0, total > 0 ? v / total : 0)) * 5;
+    const produced = model.sources.reduce((sum, s) => sum + Math.max(0, s.watts), 0);
     // a line belongs to the level of the node it leads to
     const line = (lvl: ThresholdLevel, own: ThresholdConfig[] | undefined, d: string, watts: number, active: boolean, reverse = false, opacity = 1) => {
-      const dur = flowDuration(watts);
+      const dur = energy ? null : flowDuration(watts);
       // only lines of the selected path take the threshold color, the others stay muted
       const list = elementThresholds(own, thresholds[lvl]);
-      const color = active && !isIdle(watts) ? thresholdColor(list, watts) : undefined;
+      const color = !energy && active && !isIdle(watts) ? thresholdColor(list, watts) : undefined;
       const level = color ? Math.min(thresholdLevel(list, watts), MAX_LEVEL) : 0;
       // a width set on the reached range replaces the width that follows the power
-      const width = (color ? thresholdWidth(list, watts) : undefined) ?? strokeWidth(watts) + level * 0.75;
+      const width = energy ? shareOf(watts, lvl === "source" ? produced : model.homeWatts) : (color ? thresholdWidth(list, watts) : undefined) ?? strokeWidth(watts) + level * 0.75;
       return svg`<path
         class="line ${active ? "active" : ""} ${dur && animate ? "flowing" : ""} ${reverse ? "reverse" : ""}"
         d=${d}
@@ -420,7 +561,7 @@ export class DetailedEnergyCard extends LitElement {
       <button
         class="node ${s.valid ? "" : "warn"}"
         style=${styleMap({ left: `${x}px`, top: "0px", "--node-color": s.color ?? "" })}
-        title=${s.valid ? s.name : `${s.name}: ${this._t("unavailable")}`}
+        title=${s.valid ? s.name : `${s.name}: ${this._t(s.noEnergy ? "no_energy" : "unavailable")}`}
         @click=${() => this._moreInfo(s.entity)}
       >
         <span class="circle source"><ha-icon icon=${s.icon ?? SOURCE_ICONS[s.type]}></ha-icon></span>
@@ -503,12 +644,12 @@ export class DetailedEnergyCard extends LitElement {
         ${sorted.map((c) => {
           const name = c.name ?? this._hass?.states[c.entity]?.attributes.friendly_name ?? c.entity;
           const list = elementThresholds(c.thresholds, thresholds.consumer);
-          const barColor = thresholdColor(list, c.watts);
+          const barColor = this._mode === "energy" ? undefined : thresholdColor(list, c.watts);
           const level = barColor ? Math.min(thresholdLevel(list, c.watts), MAX_LEVEL) : 0;
           const barWidth = barColor ? thresholdWidth(list, c.watts) : undefined;
           return html`
             <button class="row ${c.valid ? "" : "warn"} ${c.valid && isIdle(c.watts) ? "idle" : ""}" @click=${() => this._moreInfo(c.entity)}>
-              <span class="name">${name}<small>${c.entity}</small></span>
+              <span class="name">${name}<small>${c.noEnergy ? this._t("no_energy") : c.entity}</small></span>
               <span class="bar" style=${styleMap({ "--level": String(level), ...(barWidth !== undefined ? { "--bar-h": `${barWidth}px` } : {}) })}><div style=${styleMap({ width: `${(c.watts / max) * 100}%`, background: barColor })}></div></span>
               <span class="val">${c.valid ? this._fmt(c.watts) : "–"}</span>
             </button>

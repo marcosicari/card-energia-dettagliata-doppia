@@ -21,6 +21,7 @@ import {
   THRESHOLD,
   PALETTE,
   consumerFields,
+  ENERGY_MODE,
   GENERAL,
   HOME,
   SOURCE,
@@ -427,7 +428,7 @@ export class DetailedEnergyCardEditor extends LitElement {
     return html`<ha-form
         .hass=${this.hass}
         .data=${data}
-        .schema=${toSchema(plain, obj)}
+        .schema=${toSchema(plain, obj, this._tr)}
         .error=${fieldErrors(obj, plain, states, getPath, this._tr)}
         .computeLabel=${(s: { name: string }) => labelFor(fields, s.name, this._tr)}
         @value-changed=${(ev: CustomEvent) => this._onForm(ptr, fields, ev)}
@@ -782,7 +783,7 @@ export class DetailedEnergyCardEditor extends LitElement {
     );
     const conflict = sumConflict(this._config, (this.hass?.states ?? {}) as Record<string, StateLike | undefined>);
     return html`
-      <section><h3>${this._tr("Allgemein")}</h3>${this._form([], GENERAL)}</section>
+      <section><h3>${this._tr("Allgemein")}</h3>${this._form([], GENERAL)}${this._form([], ENERGY_MODE)}</section>
       <section><h3>${this._tr("Farben")}</h3>${this._form([], COLORS)}${this._renderThresholds()}${contrast ? html`<div class="warn">⚠ ${contrast}</div>` : nothing}</section>
       <section><h3>${this._tr("Zuhause")}</h3>${this._form([], HOME)}</section>
       ${this._renderSources()} ${this._renderStructure()}

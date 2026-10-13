@@ -17,10 +17,13 @@ export interface Field {
   /** rendered as color picker + hex field instead of a selector */
   kind?: "color";
   /** sensor kind validated against the live HA state */
-  check?: "power" | "battery";
+  check?: "power" | "battery" | "energy";
+  /** the value is a list (the config path is written with "[]" in coveredPaths) */
+  multi?: boolean;
 }
 
 const power = { entity: { domain: "sensor", device_class: "power" } };
+const energy = { entity: { domain: "sensor", device_class: "energy" } };
 const text = { text: {} };
 const icon = { icon: {} };
 export const COLOR_KEYS = ["accent", "flow", "inactive", "bar", "background", "text"];
@@ -72,6 +75,52 @@ export const GENERAL: Field[] = [
   { path: "options.focus_selected", selector: { boolean: {} }, label: "Gewählte Etage oder gewählten Raum in die Mitte schieben (die anderen blenden aus)", default: false },
 ];
 
+/** Energy mode: only offered once an element has an energy sensor. */
+export const hasEnergySensor = (cfg: any): boolean => {
+  const rooms = [...(cfg?.rooms ?? []), ...(cfg?.floors ?? []).flatMap((f: any) => f?.rooms ?? [])];
+  return (
+    !!cfg?.home?.total_energy_entity ||
+    (cfg?.sources ?? []).some((s: any) => !!s?.energy_entity) ||
+    rooms.some((r: any) => (r?.consumers ?? []).some((c: any) => !!c?.energy_entity))
+  );
+};
+
+export const ENERGY_MODE: Field[] = [
+  {
+    path: "options.mode",
+    selector: {
+      select: {
+        mode: "dropdown",
+        options: [
+          { value: "power", label: "Leistung (jetzt)" },
+          { value: "energy", label: "Energie (Heute, Woche, Monat)" },
+        ],
+      },
+    },
+    label: "Startansicht",
+    default: "power",
+    when: hasEnergySensor,
+  },
+  {
+    path: "options.energy_periods",
+    selector: {
+      select: {
+        multiple: true,
+        mode: "list",
+        options: [
+          { value: "today", label: "Heute" },
+          { value: "week", label: "Woche" },
+          { value: "month", label: "Monat" },
+        ],
+      },
+    },
+    label: "Zeiträume im Schalter",
+    default: ["today", "week", "month"],
+    multi: true,
+    when: hasEnergySensor,
+  },
+];
+
 export const COLORS: Field[] = [
   { path: "colors.preset", selector: opts(["theme", "nocturne", "custom"]), label: "Voreinstellung", default: "theme" },
   color("colors.accent", "Akzent / Auswahl"),
@@ -95,10 +144,12 @@ export const THRESHOLD: Field[] = [
 
 export const HOME: Field[] = [
   { path: "home.total_entity", selector: power, label: "Gesamt-Sensor (optional)", check: "power" },
+  { path: "home.total_energy_entity", selector: energy, label: "Gesamt-Energiesensor (optional, kWh)", check: "energy" },
 ];
 
 export const SOURCE: Field[] = [
   { path: "entity", selector: power, label: "Sensor", required: true, check: "power" },
+  { path: "energy_entity", selector: energy, label: "Energiesensor (kWh, optional)", check: "energy" },
   { path: "type", selector: opts(["solar", "battery", "grid", "generic"]), label: "Typ" },
   { path: "name", selector: text, label: "Name" },
   { path: "icon", selector: icon, label: "Icon" },
@@ -140,16 +191,24 @@ export const consumerFields = (exclude: string[] = []): Field[] => [
     required: true,
     check: "power",
   },
+  { path: "energy_entity", selector: energy, label: "Energiesensor (kWh, optional)", check: "energy" },
   { path: "name", selector: text, label: "Name (optional)" },
 ];
 
 export const CONSUMER: Field[] = consumerFields();
 
 /** Builds the ha-form schema for the fields visible for `obj`. */
-export function toSchema(fields: Field[], obj: unknown) {
+export function toSchema(fields: Field[], obj: unknown, tr: (s: string) => string = (s) => s) {
   return fields
     .filter((f) => !f.when || f.when(obj))
-    .map((f) => ({ name: f.path, selector: f.selector, required: f.required }));
+    .map((f) => ({ name: f.path, selector: translateOptions(f.selector, tr), required: f.required }));
+}
+
+/** Option labels of a select are translated like every other label. */
+function translateOptions(selector: Record<string, unknown>, tr: (s: string) => string): Record<string, unknown> {
+  const select = selector.select as { options?: Array<{ value: string; label: string }> } | undefined;
+  if (!select?.options) return selector;
+  return { ...selector, select: { ...select, options: select.options.map((o) => ({ ...o, label: tr(o.label) })) } };
 }
 
 /** Translates a field-path -> label lookup for ha-form's computeLabel. */
@@ -165,6 +224,7 @@ export function coveredPaths(): string[] {
   const prefix = (p: string, fields: Field[]) => fields.map((f) => `${p}${f.path}`);
   return [
     ...prefix("", GENERAL),
+    ...ENERGY_MODE.map((f) => `${f.path}${f.multi ? "[]" : ""}`),
     ...prefix("", COLORS),
     ...prefix("", HOME),
     ...prefix("colors.thresholds[].", THRESHOLD),

@@ -52,3 +52,17 @@ export function formatPower(watts: number, unit: UnitOption = "auto", decimals =
   const useKw = unit === "kW" || (unit === "auto" && abs >= 1000);
   return useKw ? `${numberFormat(locale, d).format(abs / 1000)} kW` : `${numberFormat(locale, 0).format(abs)} W`;
 }
+
+/** Energy sensors: the factor to watt hours, undefined for any other unit. */
+export const ENERGY_FACTORS: Record<string, number> = { Wh: 1, kWh: 1000, MWh: 1_000_000 };
+
+/**
+ * Formats watt hours as kWh, e.g. 12400 -> "12.4 kWh". Energy is shown in kWh only
+ * (the W / kW setting is for power). Values below 0.01 kWh show "0 kWh".
+ */
+export function formatEnergy(wh: number, decimals = 1, locale?: string): string {
+  const kwh = Math.abs(wh) / 1000;
+  if (kwh < 0.01) return "0 kWh";
+  const d = Number.isFinite(decimals) ? Math.min(20, Math.max(0, Math.trunc(decimals))) : 1;
+  return `${numberFormat(locale, d).format(kwh)} kWh`;
+}

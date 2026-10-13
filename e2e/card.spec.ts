@@ -90,6 +90,76 @@ test("wrapping rooms is skipped when a single row has enough room", async ({ pag
   expect(tops).toHaveLength(1);
 });
 
+test.describe("energy mode", () => {
+  // a fixed clock keeps the length of "week" and "month" (and so the numbers of the dev stub) the same on every day
+  const fixClock = (page: Page) =>
+    page.addInitScript(() => {
+      const Real = Date;
+      const fixed = new Real("2026-10-13T12:00:00Z").getTime();
+      class Fake extends Real {
+        constructor(...args: unknown[]) {
+          if (args.length) super(...(args as [string]));
+          else super(fixed);
+        }
+        static now() {
+          return fixed;
+        }
+      }
+      (window as unknown as { Date: unknown }).Date = Fake;
+    });
+  const mode = (page: Page, label: string) => page.locator("detailed-energy-card .modes button", { hasText: label });
+  const value = (page: Page, title: string) => node(page, title).locator(".value, .pill small").first();
+
+  test("shows the energy of the period in kWh and the switch for the views", async ({ page }) => {
+    await fixClock(page);
+    await open(page, "energy");
+    await expect(mode(page, "Jetzt")).toBeVisible();
+    await expect(mode(page, "Heute")).toHaveAttribute("aria-pressed", "true");
+    await expect(value(page, "PV")).toHaveText("12,4 kWh");
+    await expect(page.locator("detailed-energy-card .badge")).toContainText("Autarkie 74 %");
+    await expect(node(page, "EG").locator("small")).toHaveText("11,8 kWh");
+    // no animation and no threshold colors in the energy mode
+    await expect(page.locator("detailed-energy-card path.line.flowing")).toHaveCount(0);
+    // the coffee machine has no energy sensor
+    await expect(page.locator("detailed-energy-card .detail .row", { hasText: "Kaffeemaschine" })).toContainText("Kein Energiesensor konfiguriert");
+  });
+
+  test("switches between now, today, week and month", async ({ page }) => {
+    await fixClock(page);
+    await open(page, "energy");
+    await expect(value(page, "PV")).toHaveText("12,4 kWh");
+    await mode(page, "Woche").click();
+    await expect(mode(page, "Woche")).toHaveAttribute("aria-pressed", "true");
+    await expect(value(page, "PV")).toHaveText("24,8 kWh");
+    await mode(page, "Monat").click();
+    await expect(value(page, "PV")).toHaveText("161,2 kWh");
+    await mode(page, "Jetzt").click();
+    await expect(mode(page, "Jetzt")).toHaveAttribute("aria-pressed", "true");
+    await expect(value(page, "PV")).toHaveText("3,42 kW");
+    await expect(page.locator("detailed-energy-card path.line.flowing").first()).toBeAttached();
+  });
+
+  test("remembers the view", async ({ page }) => {
+    await fixClock(page);
+    await open(page, "energy");
+    await mode(page, "Woche").click();
+    await expect(value(page, "PV")).toHaveText("24,8 kWh");
+    await page.reload();
+    await expect(mode(page, "Woche")).toHaveAttribute("aria-pressed", "true");
+    await expect(value(page, "PV")).toHaveText("24,8 kWh");
+  });
+
+  test("says so when the statistics cannot be loaded", async ({ page }) => {
+    await page.goto("/dev/index.html?scenario=energy&energyError=1");
+    await expect(page.locator("detailed-energy-card .modes .status.warn")).toHaveText("Energiedaten nicht verfügbar");
+  });
+
+  test("a card without energy sensors has no switch", async ({ page }) => {
+    await open(page, "floors");
+    await expect(page.locator("detailed-energy-card .modes")).toHaveCount(0);
+  });
+});
+
 test.describe("consumer list options", () => {
   const configure = (page: Page, options: object) =>
     page.evaluate((o) => {

@@ -117,7 +117,7 @@ Nur **Sensoren** sind zulässig. Die Validierung erfolgt im Editor und zur Laufz
 
 - Domain `sensor.*`
 - `device_class: power`, Einheit `W`, `kW` oder `MW`
-- *(Phase 2)* `device_class: energy` (`Wh`/`kWh`) für einen Modus „Tagesverbrauch“
+- `device_class: energy` (`Wh`/`kWh`/`MWh`) als `energy_entity` für den Energie-Modus (Abschnitt 15)
 
 Nicht passende Entitäten werden im Editor ausgefiltert. Kommen sie per YAML trotzdem in die Konfiguration, zeigt die Card eine Warnung am Knoten statt abzustürzen. Eine unbekannte Einheit (z. B. `kWh`, `V`) wird nie als Watt gezählt, sondern gilt als ungültig; der SoC-Sensor einer Batterie wird getrennt gelesen und muss `%` liefern (Wert auf 0…100 begrenzt).
 
@@ -410,4 +410,18 @@ registerCardOnce(window.customCards, {
 1. Soll ein Verbraucher mehreren Räumen zugeordnet werden dürfen, z. B. anteilig?
 2. Genügt eine feste Reihenfolge der Quellen, oder soll sie sich nach der Leistung sortieren?
 3. Soll die Batterie beim Laden als eigener Verbraucherknoten erscheinen oder nur als umgekehrter Pfeil an der Quelle?
-4. Wird für den Energie-Modus die HA-Recorder-Statistik genutzt, oder werden Tageszähler (`utility_meter`) vorausgesetzt?
+4. ~~Wird für den Energie-Modus die HA-Recorder-Statistik genutzt, oder werden Tageszähler (`utility_meter`) vorausgesetzt?~~ Entschieden: Recorder-Statistik, siehe Abschnitt 15.
+
+---
+
+## 15. Energie-Modus (kWh)
+
+Die Karte zeigt neben der Leistung jetzt auch die Energie eines Zeitraums.
+
+- **Konfiguration:** `energy_entity` an Quellen und Verbrauchern (Zähler mit `device_class: energy`, Wh/kWh/MWh), `home.total_energy_entity` für „Nicht erfasst“ und die Autarkie, `options.mode` (`power` | `energy`, Startansicht) und `options.energy_periods` (Liste aus `today`, `week`, `month`, Standard alle).
+- **Schalter:** *Jetzt | Heute | Woche | Monat* im Kopf der Karte, sichtbar, sobald ein Element einen Energiesensor hat. Modus und Zeitraum werden wie die Auswahl gemerkt (`remember_selection`).
+- **Daten:** WebSocket `recorder/statistics_during_period` mit `types: ["change"]` und `units: { energy: "kWh" }` (Home Assistant rechnet jede Einheit um). Heute wird stündlich, Woche und Monat täglich summiert. Beginn von Tag, Woche und Monat liegt um Mitternacht in der Zeitzone von Home Assistant, die Woche beginnt am ersten Wochentag der Sprache (`locale.first_weekday`). Tage mit Zeitumstellung werden korrekt behandelt. Die Abfrage wiederholt sich alle 5 Minuten, solange die Karte sichtbar ist.
+- **Zustände:** Beim ersten Laden zählen alle Werte 0 und ein Hinweis „Lade Energiedaten …“ erscheint. Schlägt die Abfrage fehl, zeigt die Karte „Energiedaten nicht verfügbar“. Ein Element ohne `energy_entity` ist ausgegraut („Kein Energiesensor konfiguriert“), ein Sensor ohne Statistik gilt als nicht verfügbar.
+- **Darstellung:** Werte in kWh (`decimals`, Standard 1). Linienstärke nach Anteil am Verbrauch des Hauses (1 bis 6 px), keine Fließanimation, keine Schwellwerte, normale Flussfarbe. Intern rechnet der Modus in Wh, damit die Ruhegrenze (unter 1 Wh) und die Verbraucherliste unverändert funktionieren.
+- **Grenzen:** Einspeisung und Batterie-Laden fehlen, weil ein Energiezähler nur eine Richtung kennt. Kosten und Vergleiche mit dem Vortag gibt es nicht.
+- **Editor:** `energy_entity` bei Quellen und Verbrauchern, `total_energy_entity` bei Zuhause, Startansicht und Zeiträume unter Allgemein (nur sichtbar, sobald ein Energiesensor eingetragen ist). Der Editor prüft live, ob der Sensor `device_class: energy` und eine passende Einheit hat.

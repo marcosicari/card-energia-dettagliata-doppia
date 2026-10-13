@@ -15,19 +15,19 @@ import { validateConfig, type EnergyCardConfig } from "../src/model/config";
 const FULL: EnergyCardConfig = {
   type: "custom:detailed-energy-card",
   title: "Energiefluss",
-  home: { total_entity: "sensor.total" },
+  home: { total_entity: "sensor.total", total_energy_entity: "sensor.total_energy" },
   sources: [
-    { entity: "sensor.pv", name: "PV", type: "solar", icon: "mdi:solar-power", color: "#f2c94c", soc_entity: "sensor.soc", invert: false, thresholds: [{ from: 100, color: "#ff9800", width: 3 }] },
+    { entity: "sensor.pv", energy_entity: "sensor.pv_energy", name: "PV", type: "solar", icon: "mdi:solar-power", color: "#f2c94c", soc_entity: "sensor.soc", invert: false, thresholds: [{ from: 100, color: "#ff9800", width: 3 }] },
   ],
   floors: [
     {
       floor_id: "eg",
       color: "#fff",
       thresholds: [{ from: 100, color: "#ff9800", width: 3 }],
-      rooms: [{ area_id: "kueche", color: "#fff", thresholds: [{ from: 100, color: "#ff9800", width: 3 }], consumers: [{ entity: "sensor.a", name: "Backofen", thresholds: [{ from: 100, color: "#ff9800", width: 3 }] }] }],
+      rooms: [{ area_id: "kueche", color: "#fff", thresholds: [{ from: 100, color: "#ff9800", width: 3 }], consumers: [{ entity: "sensor.a", energy_entity: "sensor.a_energy", name: "Backofen", thresholds: [{ from: 100, color: "#ff9800", width: 3 }] }] }],
     },
   ],
-  rooms: [{ area_id: "bad", color: "#fff", thresholds: [{ from: 100, color: "#ff9800", width: 3 }], consumers: [{ entity: "sensor.b", name: "Boiler", thresholds: [{ from: 100, color: "#ff9800", width: 3 }] }] }],
+  rooms: [{ area_id: "bad", color: "#fff", thresholds: [{ from: 100, color: "#ff9800", width: 3 }], consumers: [{ entity: "sensor.b", energy_entity: "sensor.b_energy", name: "Boiler", thresholds: [{ from: 100, color: "#ff9800", width: 3 }] }] }],
   colors: {
     preset: "custom",
     accent: "#111",
@@ -44,7 +44,7 @@ const FULL: EnergyCardConfig = {
       consumer: [{ from: 300, color: "#ff9800", width: 3 }],
     },
   },
-  options: { unit: "auto", decimals: 2, animation: true, show_unassigned: true, show_consumers: true, only_active_consumers: false, remember_selection: true, wrap_rooms: false, focus_selected: false },
+  options: { unit: "auto", decimals: 2, animation: true, show_unassigned: true, show_consumers: true, only_active_consumers: false, remember_selection: true, wrap_rooms: false, focus_selected: false, mode: "power", energy_periods: ["today", "week"] },
 };
 
 describe("editor coverage", () => {
