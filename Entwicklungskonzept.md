@@ -351,6 +351,7 @@ Alle Farben sind anpassbar, im visuellen Editor (Bereich „Farben“) und per Y
 | **1.0.0** | Energie-Modus (kWh heute, Woche, Monat) aus der Recorder-Statistik mit `energy_entity` und Schalter in der Karte. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.0.1** | Editor-Stil im dunklen Theme, doppelte `energy_entity` wird abgelehnt, neue Screenshots. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.0.2** | Interne Umstellung: Editor-Texte über typisierte Schlüssel statt deutscher Texte, keine sichtbare Änderung. Details in [CHANGELOG.md](CHANGELOG.md) |
+| **1.1.0** | Neue Option `options.storage_id` (trennt Karten mit gleicher Struktur), Auswahl-Schlüssel ohne Hash (die gemerkte Auswahl wird einmal zurückgesetzt). Korrekturen: Energiewerte werden nach Wiederanhängen und Sichtbarwerden neu geladen, doppelte `energy_entity` im Editor, Wochenstart bei `first_weekday: language`, Hinweise zu Energiesensoren im Editor, Nachkommastellen-Feld ohne falschen Standardwert. `render()` ohne Seiteneffekte. Details in [CHANGELOG.md](CHANGELOG.md) |
 
 ---
 
