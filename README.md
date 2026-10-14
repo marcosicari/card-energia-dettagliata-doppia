@@ -156,6 +156,8 @@ npm run icon        # re-render docs/icon.png and docs/social-preview.png
 
 Releases: raise `version` in `package.json`, merge, then push the tag `v<version>`; the release workflow refuses a tag that does not match. Add the changes to [CHANGELOG.md](CHANGELOG.md) first.
 
+Texts: card and editor look up their texts by key in `src/localize/index.ts` and `src/localize/editor.ts`. Each file has a German table `de` and an English table `en: typeof de`, so a new text needs a key in both, and the type check fails when one is missing. Do not write German text directly in `src/editor/`; a test checks that.
+
 `npx vite` serves `dev/index.html`, a mock-data preview. Pick a scenario with `?scenario=floors|flat|many|wrap|invalid`.
 
 Locally the browser tests use the installed Microsoft Edge; in CI they use Chromium (`npx playwright install chromium`).

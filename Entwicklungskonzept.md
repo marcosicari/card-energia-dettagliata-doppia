@@ -226,8 +226,14 @@ src/
   view/layout.ts            // Geometrie: Positionen, Kurven, Linienstärke, Animationsdauer
   styles/theme.ts           // CSS-Variablen und Styles
   localize/index.ts         // Texte der Card (DE/EN), Standardnamen der Quellen
-  localize/editor.ts        // Texte des Editors (Schlüssel = deutscher Text, EN-Tabelle)
+  localize/editor.ts        // Texte des Editors (DE/EN, typisierte Schlüssel)
 ```
+
+**Texte und Sprachen**
+
+- Card und Editor holen ihre Texte über Schlüssel aus je einer deutschen und einer englischen Tabelle (`const de = {...}`, `const en: typeof de = {...}`). Fehlt eine Übersetzung oder ist ein Schlüssel vertippt, schlägt der Typecheck fehl.
+- Im Editor sind Feld-, Farb- und Ebenen-Beschriftungen in `schema.ts` und `card-editor.ts` Schlüssel vom Typ `EditorKey`; `makeTr(sprache)` liefert die Texte, Platzhalter `{0}`, `{1}` werden ersetzt. Sprachen, die mit `de` beginnen, bekommen Deutsch, alle anderen Englisch.
+- Ein neuer Editor-Text bekommt einen Schlüssel in beiden Tabellen von `src/localize/editor.ts`, nie einen deutschen Text direkt im Code: ein Test prüft, dass `src/editor/` keine Umlaute und „“ enthält.
 
 **Performance**
 

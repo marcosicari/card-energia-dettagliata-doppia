@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Docs
+
+- `Entwicklungskonzept.md` (section 8) and the README describe how card and editor texts are looked up by typed keys and how to add a new text.
+
 ## 1.0.2
 
 ### Internal
