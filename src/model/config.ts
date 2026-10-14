@@ -74,6 +74,8 @@ export interface OptionsConfig {
   /** list only consumers that draw power (1 W or more); sensors that cannot be read stay listed as warnings */
   only_active_consumers?: boolean;
   remember_selection?: boolean;
+  /** tells cards with the same floors and rooms apart in the remembered selection (default: none) */
+  storage_id?: string;
   wrap_rooms?: boolean;
   /** the selected floor / room slides to the middle under its parent, the others of its level fade out */
   focus_selected?: boolean;
@@ -143,6 +145,7 @@ export const ENERGY_PERIODS = ["today", "week", "month"] as const;
 export type EnergyPeriod = (typeof ENERGY_PERIODS)[number];
 /** Decimal places: Intl.NumberFormat accepts 0..20 everywhere; the editor offers 0..4. */
 export const MAX_DECIMALS = 20;
+const MAX_STORAGE_ID = 64;
 const COLOR_KEYS = ["accent", "flow", "inactive", "bar", "background", "text"] as const;
 const PRESETS = ["theme", "nocturne", "custom"];
 
@@ -164,6 +167,10 @@ function checkOptions(options: unknown): void {
       throw new ConfigError(`options.energy_periods[${i}]: "${String(p)}" must be one of ${ENERGY_PERIODS.join(", ")}`);
     }
   });
+  const id = options.storage_id;
+  if (id !== undefined && (typeof id !== "string" || !id || id.length > MAX_STORAGE_ID)) {
+    throw new ConfigError(`options.storage_id must be text of 1 to ${MAX_STORAGE_ID} characters`);
+  }
   for (const key of ["animation", "show_unassigned", "show_consumers", "only_active_consumers", "remember_selection", "wrap_rooms", "focus_selected"]) {
     checkBool(options[key], `options.${key}`);
   }

@@ -98,6 +98,7 @@ options:
   show_consumers: true        # false: Verbraucher-Liste ausblenden
   only_active_consumers: false # true: nur Verbraucher ab 1 W listen
   remember_selection: true
+  storage_id: ""              # optional, trennt Karten mit gleicher Struktur (z. B. Leistung und Energie)
   mode: power                 # power | energy (Startansicht, Energie-Modus siehe Abschnitt 15)
   energy_periods: [today, week, month]   # optional, Zeiträume des Schalters (Standard alle)
 ```
@@ -197,7 +198,7 @@ Die Berechnung liegt als reine Funktion in `src/model/compute.ts`, ohne DOM. So 
 | Klick auf Quelle | Öffnet ebenfalls den More-Info-Dialog. |
 
 - Oben in der Card steht der Pfad, z. B. „Zuhause › EG › Küche“.
-- Die Auswahl wird pro Card in `localStorage` gespeichert (Option `remember_selection`), als `floor_id` / `area_id`. Der Schlüssel entsteht nur aus den Struktur-IDs; Farben, Namen, Verbraucher und Umbenennungen in Home Assistant setzen sie nicht zurück. Ein beschädigter Wert wird ignoriert, Einträge des alten Formats (Auswahl nach Namen) werden beim Laden entfernt.
+- Die Auswahl wird pro Card in `localStorage` gespeichert (Option `remember_selection`), als `floor_id` / `area_id`. Der Schlüssel entsteht nur aus den Struktur-IDs (im Klartext, ohne Hash) und der optionalen `options.storage_id`, die Karten mit gleicher Struktur trennt; Farben, Namen, Verbraucher und Umbenennungen in Home Assistant setzen sie nicht zurück. Ein beschädigter Wert wird ignoriert, Einträge älterer Formate (Auswahl nach Namen, gehashter Schlüssel) werden einmal pro Seitenladung entfernt.
 
 ---
 

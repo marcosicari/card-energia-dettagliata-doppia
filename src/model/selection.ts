@@ -8,24 +8,20 @@ export interface Selection {
 }
 
 export const STORAGE_PREFIX = "detailed-energy-card:";
-const KEY_PREFIX = `${STORAGE_PREFIX}sel:`;
-
-const hashOf = (s: string): string => {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  return (h >>> 0).toString(36);
-};
+const KEY_PREFIX = `${STORAGE_PREFIX}sel2:`;
 
 /**
  * Storage key of a card: derived from the floor and area ids only, so changing colors, names or
  * consumers keeps the remembered selection, while two cards with different structure stay apart.
+ * The ids are used as they are (no hash, so no collisions). Cards with the same structure
+ * (say a power and an energy view) are told apart by `options.storage_id`.
  */
 export function selectionKey(cfg: EnergyCardConfig | undefined): string {
   const ids = {
     f: (cfg?.floors ?? []).map((f) => [f.floor_id, (f.rooms ?? []).map((r) => r.area_id)]),
     r: (cfg?.rooms ?? []).map((r) => r.area_id),
   };
-  return `${KEY_PREFIX}${hashOf(JSON.stringify(ids))}`;
+  return `${KEY_PREFIX}${encodeURIComponent(cfg?.options?.storage_id ?? "")}:${JSON.stringify(ids)}`;
 }
 
 const idOrNull = (v: unknown): string | null | undefined =>
@@ -49,7 +45,7 @@ export function parseSelection(raw: string | null): Selection {
   }
 }
 
-/** Removes keys of the old format (selection by name, key from the whole config). */
+/** Removes keys of the old formats (selection by name, key from the whole config, hashed key). */
 export function removeLegacyKeys(storage: Pick<Storage, "length" | "key" | "removeItem">): void {
   const stale: string[] = [];
   for (let i = 0; i < storage.length; i++) {
@@ -57,4 +53,13 @@ export function removeLegacyKeys(storage: Pick<Storage, "length" | "key" | "remo
     if (k && k.startsWith(STORAGE_PREFIX) && !k.startsWith(KEY_PREFIX)) stale.push(k);
   }
   for (const k of stale) storage.removeItem(k);
+}
+
+let legacyKeysRemoved = false;
+
+/** The old keys only need to go once per page load, not with every `setConfig` (the editor sends one per change). */
+export function removeLegacyKeysOnce(storage: Pick<Storage, "length" | "key" | "removeItem">): void {
+  if (legacyKeysRemoved) return;
+  removeLegacyKeys(storage);
+  legacyKeysRemoved = true;
 }

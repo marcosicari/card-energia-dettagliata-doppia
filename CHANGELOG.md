@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Added
+
+- `options.storage_id` (editor: *Selection ID*): two cards with the same floors and rooms, say a power and an energy view, no longer share the remembered selection and view when each has its own id.
+
+### Internal
+
+- `render()` only reads: the positions of the floors and rooms and the start of the slide after a selection change are computed in `willUpdate()`.
+
+### Changed
+
+- The key of the remembered selection is built from the ids without a hash, so different structures can no longer collide. The remembered selection is reset once; the old entries are removed.
+- The old entries in `localStorage` are looked for once per page load instead of with every configuration change.
+
+### Fixed
+
+- Energy mode: the values are loaded again when the card is attached again (moved in the edit mode, view change) and when it becomes visible after being hidden. Before, the card could stay on "Loading energy data ..." or show old numbers until a power sensor changed.
+- Editor: an `energy_entity` already used by another consumer is no longer offered and a duplicate is reported, like for `entity`. Switching floors off no longer assigns such a sensor twice.
+- Energy mode: `first_weekday: language` (the Home Assistant default) now takes the first day of the week from the language instead of always Monday, so the week matches the Energy dashboard.
+- Editor: the notes *err_not_energy* / *err_energy_unit* about an energy sensor update as soon as that sensor changes, not only after another field was edited.
+- Editor: the *Decimals* field no longer shows 2 when nothing is set. It is empty and its label says what applies (2 for power, 1 for energy), as the card always did.
+
 ### Docs
 
 - `Entwicklungskonzept.md` (section 8) and the README describe how card and editor texts are looked up by typed keys and how to add a new text.

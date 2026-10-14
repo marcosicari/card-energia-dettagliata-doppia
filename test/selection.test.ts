@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSelection, removeLegacyKeys, selectionKey } from "../src/model/selection";
+import { parseSelection, removeLegacyKeys, removeLegacyKeysOnce, selectionKey } from "../src/model/selection";
 import type { EnergyCardConfig } from "../src/model/config";
 
 const cfg = (extra: Partial<EnergyCardConfig> = {}): EnergyCardConfig =>
@@ -29,6 +29,21 @@ describe("selectionKey", () => {
   });
 });
 
+describe("selectionKey of cards with the same structure", () => {
+  it("is told apart by options.storage_id", () => {
+    const a = selectionKey(cfg({ options: { storage_id: "power" } }));
+    const b = selectionKey(cfg({ options: { storage_id: "energy" } }));
+    expect(a).not.toBe(b);
+    expect(a).not.toBe(selectionKey(cfg()));
+    expect(selectionKey(cfg({ options: { storage_id: "power" } }))).toBe(a);
+  });
+  it("does not hash the structure", () => {
+    const k = selectionKey(cfg());
+    expect(k).toContain('"eg"');
+    expect(k).toContain('"kueche"');
+  });
+});
+
 describe("parseSelection", () => {
   it("reads a valid selection", () => {
     expect(parseSelection('{"floor":"eg","room":null}')).toEqual({ floor: "eg", room: null });
@@ -45,7 +60,8 @@ describe("removeLegacyKeys", () => {
   it("removes old keys once and keeps new and foreign keys", () => {
     const data: Record<string, string> = {
       "detailed-energy-card:abc": "{}",
-      "detailed-energy-card:sel:xyz": "{}",
+      "detailed-energy-card:sel:xyz": "{}", // hashed key of 1.0
+      "detailed-energy-card:sel2:::[]": "{}",
       "other:key": "1",
     };
     const storage = {
@@ -56,7 +72,7 @@ describe("removeLegacyKeys", () => {
       removeItem: (k: string) => void delete data[k],
     };
     removeLegacyKeys(storage);
-    expect(Object.keys(data).sort()).toEqual(["detailed-energy-card:sel:xyz", "other:key"]);
+    expect(Object.keys(data).sort()).toEqual(["detailed-energy-card:sel2:::[]", "other:key"]);
   });
 });
 
@@ -69,5 +85,22 @@ describe("model ids", () => {
     );
     expect(model.floors[0].id).toBe("eg");
     expect(model.floors[0].rooms[0].id).toBe("kueche");
+  });
+});
+
+describe("removeLegacyKeysOnce", () => {
+  it("scans the storage only the first time", () => {
+    let scans = 0;
+    const storage = {
+      get length() {
+        scans++;
+        return 0;
+      },
+      key: () => null,
+      removeItem: () => {},
+    };
+    removeLegacyKeysOnce(storage);
+    removeLegacyKeysOnce(storage);
+    expect(scans).toBe(1);
   });
 });

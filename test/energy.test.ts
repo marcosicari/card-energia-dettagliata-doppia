@@ -43,6 +43,12 @@ describe("periodStart", () => {
     expect(firstWeekdayIndex("sunday")).toBe(0);
     expect(firstWeekdayIndex("saturday")).toBe(6);
     expect(firstWeekdayIndex("language")).toBe(1);
+    expect(firstWeekdayIndex("language", "not a language!")).toBe(1);
+  });
+  it("derives the first weekday from the language when Home Assistant says \"language\"", () => {
+    expect(firstWeekdayIndex("language", "en")).toBe(0);
+    expect(firstWeekdayIndex("language", "de")).toBe(1);
+    expect(firstWeekdayIndex("saturday", "de")).toBe(6);
     expect(firstWeekdayIndex(undefined)).toBe(1);
   });
 });

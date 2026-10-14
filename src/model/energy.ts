@@ -31,10 +31,31 @@ export function localMidnight(year: number, month: number, day: number, timeZone
 
 const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
-/** Index (0 = Sunday) of the first day of the week from the Home Assistant locale (`first_weekday`); Monday by default. */
-export const firstWeekdayIndex = (value: string | undefined): number => {
-  const i = WEEKDAYS.indexOf(String(value ?? "").toLowerCase());
-  return i >= 0 ? i : 1;
+/** First day of the week of a language (0 = Sunday), from the browser's locale data; undefined when it has none. */
+function weekStartOf(language: string | undefined): number | undefined {
+  try {
+    if (!language) return undefined;
+    // "en" alone has no region: maximize() adds the likely one (en-US)
+    const loc = new Intl.Locale(language).maximize() as Intl.Locale & {
+      getWeekInfo?: () => { firstDay: number };
+      weekInfo?: { firstDay: number };
+    };
+    const first = (loc.getWeekInfo?.() ?? loc.weekInfo)?.firstDay;
+    return typeof first === "number" ? first % 7 : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Index (0 = Sunday) of the first day of the week from the Home Assistant locale (`first_weekday`).
+ * "language" (the Home Assistant default) follows the language of the user; Monday when that is unknown.
+ */
+export const firstWeekdayIndex = (value: string | undefined, language?: string): number => {
+  const v = String(value ?? "").toLowerCase();
+  const i = WEEKDAYS.indexOf(v);
+  if (i >= 0) return i;
+  return (v === "language" ? weekStartOf(language) : undefined) ?? 1;
 };
 
 /** Start of the day / week / month that contains `now`, in the time zone of Home Assistant. */

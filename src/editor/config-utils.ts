@@ -1,4 +1,4 @@
-import type { EnergyCardConfig, RoomConfig } from "../model/config";
+import { collectEnergyIds, collectEntityIds, type EnergyCardConfig, type RoomConfig } from "../model/config";
 
 export type Pointer = Array<string | number>;
 type Obj = Record<string, unknown>;
@@ -95,12 +95,13 @@ export function toggleFloors(
   if (!floors) return cfg;
   const flat: RoomConfig[] = floors.flatMap((f) => f.rooms ?? []);
   const usedAreas = new Set(flat.map((r) => r.area_id));
-  const usedSensors = new Set(flat.flatMap((r) => (r.consumers ?? []).map((c) => c.entity)));
+  const sensorsOf = (r: RoomConfig) => (r.consumers ?? []).flatMap((c) => [c.entity, c.energy_entity].filter((e): e is string => !!e));
+  const usedSensors = new Set(flat.flatMap(sensorsOf));
   for (const r of restore) {
     if (usedAreas.has(r.area_id)) continue;
     usedAreas.add(r.area_id);
-    const consumers = (r.consumers ?? []).filter((c) => !usedSensors.has(c.entity));
-    consumers.forEach((c) => usedSensors.add(c.entity));
+    const consumers = (r.consumers ?? []).filter((c) => ![c.entity, c.energy_entity].some((e) => e && usedSensors.has(e)));
+    sensorsOf({ ...r, consumers }).forEach((e) => usedSensors.add(e));
     flat.push({ ...r, consumers });
   }
   return { ...rest, rooms: flat };
@@ -112,7 +113,7 @@ export interface Duplicate {
 }
 
 /**
- * Consumer sensors that are taken by any slot other than `ptr` (a pointer like
+ * Consumer sensors (power and energy) that are taken by any slot other than `ptr` (a pointer like
  * ["floors", 0, "rooms", 1, "consumers", 2]); these must not be offered again.
  */
 export function consumerEntitiesExcept(cfg: EnergyCardConfig | undefined, ptr: Pointer): string[] {
@@ -122,7 +123,9 @@ export function consumerEntitiesExcept(cfg: EnergyCardConfig | undefined, ptr: P
     (rooms ?? []).forEach((r, i) =>
       (r.consumers ?? []).forEach((c, j) => {
         const at = [...base, i, "consumers", j].join(".");
-        if (c.entity && at !== own) taken.push(c.entity);
+        if (at === own) return;
+        if (c.entity) taken.push(c.entity);
+        if (c.energy_entity) taken.push(c.energy_entity);
       }),
     );
   scan(cfg?.rooms, ["rooms"]);
@@ -130,12 +133,18 @@ export function consumerEntitiesExcept(cfg: EnergyCardConfig | undefined, ptr: P
   return taken;
 }
 
-/** Sensors assigned to more than one consumer slot (allowed, but warned about). */
+/** Sensors (power or energy) assigned to more than one consumer slot; the card refuses such a config. */
 export function findDuplicates(cfg: EnergyCardConfig): Duplicate[] {
   const seen = new Map<string, string[]>();
   const add = (entity: string, place: string) => seen.set(entity, [...(seen.get(entity) ?? []), place]);
   const rooms = (rs: RoomConfig[], prefix: string) =>
-    rs.forEach((r) => (r.consumers ?? []).forEach((c) => c.entity && add(c.entity, `${prefix}${r.name ?? r.area_id}`)));
+    rs.forEach((r) =>
+      (r.consumers ?? []).forEach((c) => {
+        const place = `${prefix}${r.name ?? r.area_id}`;
+        if (c.entity) add(c.entity, place);
+        if (c.energy_entity) add(c.energy_entity, place);
+      }),
+    );
   rooms(cfg.rooms ?? [], "");
   (cfg.floors ?? []).forEach((f) => rooms(f.rooms ?? [], `${f.name ?? f.floor_id} › `));
   return [...seen].filter(([, p]) => p.length > 1).map(([entity, places]) => ({ entity, places }));
@@ -148,4 +157,12 @@ export function reorder<T>(list: T[], from: number, to: number): T[] {
   const [item] = copy.splice(from, 1);
   copy.splice(to, 0, item);
   return copy;
+}
+
+/**
+ * Entities whose changes the editor re-renders for: power and energy sensors alike, because the
+ * hints of the fields (device class, unit) depend on the state of both.
+ */
+export function observedEntityIds(cfg: EnergyCardConfig): string[] {
+  return [...new Set([...collectEntityIds(cfg), ...collectEnergyIds(cfg)])];
 }

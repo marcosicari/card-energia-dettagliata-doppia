@@ -28,6 +28,12 @@ describe("validateConfig: types (U-5)", () => {
 });
 
 describe("validateConfig: options (U-1)", () => {
+  it.each(["", 5, "x".repeat(65)])("rejects storage_id %j", (storage_id) => {
+    rejects({ options: { storage_id } }, /options\.storage_id/);
+  });
+  it("accepts a storage_id", () => {
+    expect(() => validateConfig({ ...base, options: { storage_id: "energy-view" } })).not.toThrow();
+  });
   it.each([-1, -3, 21, 1.5, "2", Number.NaN])("rejects decimals %s", (decimals) => {
     rejects({ options: { decimals } }, /options\.decimals/);
   });

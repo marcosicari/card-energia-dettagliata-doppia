@@ -62,7 +62,7 @@ const opts = (values: string[]) => ({ select: { mode: "box", options: values.map
 export const GENERAL: Field[] = [
   { path: "title", selector: text, label: "field_title" },
   { path: "options.unit", selector: opts(["W", "kW", "auto"]), label: "field_unit", default: "W" },
-  { path: "options.decimals", selector: { number: { min: 0, max: 4, mode: "box" } }, label: "field_decimals", default: 2 },
+  { path: "options.decimals", selector: { number: { min: 0, max: 4, mode: "box" } }, label: "field_decimals" },
   { path: "options.animation", selector: { boolean: {} }, label: "field_animation", default: true },
   { path: "options.show_consumers", selector: { boolean: {} }, label: "field_show_consumers", default: true },
   {
@@ -74,6 +74,12 @@ export const GENERAL: Field[] = [
   },
   { path: "options.show_unassigned", selector: { boolean: {} }, label: "field_show_unassigned", default: true, when: (cfg: any) => cfg?.options?.show_consumers !== false },
   { path: "options.remember_selection", selector: { boolean: {} }, label: "field_remember_selection", default: true },
+  {
+    path: "options.storage_id",
+    selector: text,
+    label: "field_storage_id",
+    when: (cfg: any) => cfg?.options?.remember_selection !== false,
+  },
   { path: "options.wrap_rooms", selector: { boolean: {} }, label: "field_wrap_rooms", default: false },
   { path: "options.focus_selected", selector: { boolean: {} }, label: "field_focus_selected", default: false },
 ];
@@ -176,7 +182,7 @@ export const roomFields = (choices: Choice[] = []): Field[] => [
   color("color", "field_color"),
 ];
 
-/** Consumer sensors: power sensors that are not yet assigned to another consumer. */
+/** Consumer sensors: power and energy sensors that are not yet assigned to another consumer. */
 export const consumerFields = (exclude: string[] = []): Field[] => [
   {
     path: "entity",
@@ -185,7 +191,12 @@ export const consumerFields = (exclude: string[] = []): Field[] => [
     required: true,
     check: "power",
   },
-  { path: "energy_entity", selector: energy, label: "field_energy_entity", check: "energy" },
+  {
+    path: "energy_entity",
+    selector: { entity: { ...energy.entity, exclude_entities: exclude } },
+    label: "field_energy_entity",
+    check: "energy",
+  },
   { path: "name", selector: text, label: "field_name_optional" },
 ];
 

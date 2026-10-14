@@ -149,6 +149,29 @@ test.describe("energy mode", () => {
     await expect(value(page, "PV")).toHaveText("24,8 kWh");
   });
 
+  test("loads again when the card is detached while the statistics are on their way", async ({ page }) => {
+    await open(page, "energy");
+    await page.evaluate(() => {
+      const el = document.querySelector("detailed-energy-card") as unknown as {
+        _hass: { callWS(m: { type: string }): Promise<unknown> };
+        _config: object;
+        setConfig(c: object): void;
+      };
+      const w = window as unknown as { __stat: number };
+      w.__stat = 0;
+      const orig = el._hass.callWS.bind(el._hass);
+      // the first request never answers, like one that was cut off by moving the card
+      el._hass.callWS = (m) => (m.type.startsWith("recorder") && ++w.__stat === 1 ? new Promise(() => {}) : orig(m));
+      el.setConfig(el._config);
+      const host = el as unknown as HTMLElement;
+      host.remove();
+      document.body.appendChild(host);
+    });
+    await expect(page.locator("detailed-energy-card .modes .status")).toHaveCount(0);
+    await expect(value(page, "PV")).toHaveText("12,4 kWh");
+    expect(await page.evaluate(() => (window as unknown as { __stat: number }).__stat)).toBe(2);
+  });
+
   test("says so when the statistics cannot be loaded", async ({ page }) => {
     await page.goto("/dev/index.html?scenario=energy&energyError=1");
     await expect(page.locator("detailed-energy-card .modes .status.warn")).toHaveText("Energiedaten nicht verfügbar");

@@ -14,7 +14,7 @@ import "./editor/card-editor";
 import { defineOnce, registerCardOnce } from "./register";
 import { RegistrySource, resolveNames, type AreaEntry, type FloorEntry } from "./model/registry";
 import { Tween, focusTargets, type Pos } from "./view/focus";
-import { parseSelection, removeLegacyKeys, selectionKey, type Selection } from "./model/selection";
+import { parseSelection, removeLegacyKeysOnce, selectionKey, type Selection } from "./model/selection";
 import {
   computeLayout,
   curve,
@@ -75,6 +75,8 @@ export class DetailedEnergyCard extends LitElement {
   @state() private _energy?: Map<string, number>;
   @state() private _energyState: "idle" | "loading" | "ok" | "error" = "idle";
   private _energyTimer = 0;
+  /** when the last answer arrived (ms); 0 = none for the current view */
+  private _energyAt = 0;
   private _energyToken = 0;
 
   private _hass?: Hass;
@@ -87,6 +89,8 @@ export class DetailedEnergyCard extends LitElement {
   private _tween?: Tween;
   private _raf = 0;
   private _lastSelKey?: string;
+  /** positions drawn by the current render, computed in `willUpdate` */
+  private _frame?: { floorViews: Pos[]; roomViews: RoomView[] };
   /** what the previous render showed, the start of the next slide */
   private _lastShown = new Map<string, Pos>();
   private _lastRooms = new Map<string, RoomNode>();
@@ -157,10 +161,15 @@ export class DetailedEnergyCard extends LitElement {
     if (typeof IntersectionObserver !== "undefined") {
       this._io = new IntersectionObserver((entries) => {
         const last = entries[entries.length - 1];
-        if (last) this.classList.toggle("offscreen", !last.isIntersecting);
+        if (!last) return;
+        this.classList.toggle("offscreen", !last.isIntersecting);
+        // the timer chain pauses while the card is hidden: catch up when it is seen again
+        if (last.isIntersecting) this._refreshEnergy();
       });
       this._io.observe(this);
     }
+    // re-attached (moved in the edit mode, view change): the refresh stopped when the card was detached
+    this._refreshEnergy();
   }
 
   disconnectedCallback(): void {
@@ -170,6 +179,8 @@ export class DetailedEnergyCard extends LitElement {
     cancelAnimationFrame(this._raf);
     clearTimeout(this._energyTimer);
     this._energyToken++;
+    // an answer that is still on its way is dropped (token), so "loading" would never end
+    if (this._energyState === "loading") this._energyState = "idle";
     this._tween = undefined;
     this.classList.remove("offscreen");
     this._observed = undefined;
@@ -214,7 +225,7 @@ export class DetailedEnergyCard extends LitElement {
   private _loadSelection(): Selection {
     if (this._config?.options?.remember_selection === false) return {};
     try {
-      removeLegacyKeys(localStorage);
+      removeLegacyKeysOnce(localStorage);
       return parseSelection(localStorage.getItem(this._storageKey));
     } catch {
       return {};
@@ -276,6 +287,7 @@ export class DetailedEnergyCard extends LitElement {
     this._period = period;
     this._energy = undefined;
     this._energyState = "idle";
+    this._energyAt = 0;
     clearTimeout(this._energyTimer);
     this._energyToken++;
   }
@@ -296,6 +308,7 @@ export class DetailedEnergyCard extends LitElement {
     this._energyToken++;
     // the numbers of another period would be wrong for this one
     this._energy = undefined;
+    this._energyAt = 0;
     if (mode === "energy") {
       this._energyState = "idle";
       this._ensureEnergy(true);
@@ -308,6 +321,26 @@ export class DetailedEnergyCard extends LitElement {
     if (this._mode !== "energy" || !this._config || !this._hass) return;
     if (!force && this._energyState !== "idle") return;
     void this._fetchEnergy();
+  }
+
+  /**
+   * Brings the energy values up to date after the refresh chain was interrupted (card detached or hidden):
+   * loads again when the last answer is old, otherwise waits out the rest of the interval.
+   */
+  private _refreshEnergy(): void {
+    if (this._mode !== "energy" || !this._config || !this._hass || this._energyState === "loading") return;
+    const age = Date.now() - this._energyAt;
+    if (this._energyState === "ok" && age < ENERGY_REFRESH_MS) {
+      clearTimeout(this._energyTimer);
+      this._energyTimer = window.setTimeout(() => this._onEnergyTimer(), ENERGY_REFRESH_MS - age);
+      return;
+    }
+    void this._fetchEnergy();
+  }
+
+  private _onEnergyTimer(): void {
+    // while the card is hidden the chain just ends; the observer starts it again when the card is seen
+    if (!this.classList.contains("offscreen")) void this._fetchEnergy();
   }
 
   private async _fetchEnergy(): Promise<void> {
@@ -325,10 +358,11 @@ export class DetailedEnergyCard extends LitElement {
         this._period,
         new Date(),
         hass.config?.time_zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-        firstWeekdayIndex(hass.locale?.first_weekday),
+        firstWeekdayIndex(hass.locale?.first_weekday, hass.locale?.language ?? hass.language),
       );
       if (token !== this._energyToken) return;
       this._energy = values;
+      this._energyAt = Date.now();
       this._energyState = "ok";
     } catch {
       if (token !== this._energyToken) return;
@@ -337,10 +371,7 @@ export class DetailedEnergyCard extends LitElement {
     }
     this._recompute();
     // the statistics are compiled every few minutes: ask again from time to time
-    this._energyTimer = window.setTimeout(() => {
-      if (this.classList.contains("offscreen")) this._energyState = "idle";
-      else void this._fetchEnergy();
-    }, ENERGY_REFRESH_MS);
+    this._energyTimer = window.setTimeout(() => this._onEnergyTimer(), ENERGY_REFRESH_MS);
   }
 
   private _renderModeSwitch(cfg: EnergyCardConfig): TemplateResult | typeof nothing {
@@ -397,20 +428,76 @@ export class DetailedEnergyCard extends LitElement {
 
   // ---------- render ----------
 
-  protected render(): TemplateResult {
-    if (this._error) return html`<ha-card><div class="error">${this._error}</div></ha-card>`;
+  /** What the selection and the width of the card make of the diagram: pure, nothing is stored. */
+  private _geometry(model: EnergyModel) {
     const cfg = this._config;
-    const model = this._model;
-    if (!cfg || !model) return html`<ha-card></ha-card>`;
-
     const sel = this._resolve(model);
     const layout = computeLayout({
       width: this._width || 320,
       sources: model.sources.length,
       floors: model.floors.length,
       rooms: sel.rooms.length,
-      wrap: cfg.options?.wrap_rooms === true,
+      wrap: cfg?.options?.wrap_rooms === true,
     });
+    // Positions of the floors and rooms. With options.focus_selected the selected element of a level
+    // slides to the middle under its parent and the rest of that level fades out behind it.
+    const tg = focusTargets({
+      layout,
+      floors: model.floors.length,
+      selFloor: sel.floor,
+      rooms: sel.rooms.length,
+      selRoom: sel.room,
+      focus: this._focus,
+    });
+    const targets = new Map<string, Pos>();
+    model.floors.forEach((f, i) => targets.set(`f:${f.id}`, tg.floors[i]));
+    sel.rooms.forEach((r, i) => targets.set(`r:${r.id}`, tg.rooms[i]));
+    const selKey = `${sel.floor ?? ""}|${sel.room ?? ""}`;
+    return { sel, layout, tg, targets, selKey };
+  }
+
+  /**
+   * Where the floors and rooms are drawn now. Runs before every render (and not in `render()`, which only
+   * reads the result): a changed selection starts the slide from what the previous frame showed.
+   */
+  protected willUpdate(): void {
+    const model = this._model;
+    if (this._error || !this._config || !model) {
+      this._frame = undefined;
+      return;
+    }
+    const { sel, layout, tg, targets, selKey } = this._geometry(model);
+    if (this._focus && this._lastSelKey !== undefined && selKey !== this._lastSelKey) {
+      const parent = sel.floor !== undefined ? tg.floors[sel.floor] : { x: layout.homeX, y: layout.yHome, o: 1 };
+      this._startTween(targets, { x: parent.x, y: parent.y + FLOOR_H / 2, o: 0 });
+    }
+    this._lastSelKey = selKey;
+    const now = performance.now();
+    if (this._tween?.finished(now)) this._tween = undefined;
+    const pos = (id: string): Pos => this._tween?.sample(id, now) ?? targets.get(id) ?? { x: 0, y: 0, o: 0 };
+    const floorViews = model.floors.map((f) => pos(`f:${f.id}`));
+    sel.rooms.forEach((r) => this._lastRooms.set(r.id, r));
+    const roomViews: RoomView[] = sel.rooms.map((r) => ({ room: r, p: pos(`r:${r.id}`), leaving: false }));
+    // rooms of a floor that was just left fade out where they were
+    for (const id of this._tween?.leaving ?? []) {
+      const gone = id.startsWith("r:") ? this._lastRooms.get(id.slice(2)) : undefined;
+      if (gone) roomViews.push({ room: gone, p: pos(id), leaving: true });
+    }
+    this._lastShown = new Map([
+      ...model.floors.map((f, i) => [`f:${f.id}`, floorViews[i]] as const),
+      ...roomViews.map((v) => [`r:${v.room.id}`, v.p] as const),
+    ]);
+    this._frame = { floorViews, roomViews };
+  }
+
+  protected render(): TemplateResult {
+    if (this._error) return html`<ha-card><div class="error">${this._error}</div></ha-card>`;
+    const cfg = this._config;
+    const model = this._model;
+    const frame = this._frame;
+    if (!cfg || !model || !frame) return html`<ha-card></ha-card>`;
+
+    const { sel, layout } = this._geometry(model);
     const floor = sel.floor !== undefined ? model.floors[sel.floor] : undefined;
     const room = sel.room !== undefined ? sel.rooms[sel.room] : undefined;
     const home = this._hass?.config?.location_name ?? this._t("home");
@@ -437,40 +524,7 @@ export class DetailedEnergyCard extends LitElement {
       : room;
     const path = [home, floor?.name, room?.name].filter(Boolean).join(" › ");
 
-    // Positions of the floors and rooms. With options.focus_selected the selected element of a level
-    // slides to the middle under its parent and the rest of that level fades out behind it.
-    const tg = focusTargets({
-      layout,
-      floors: model.floors.length,
-      selFloor: sel.floor,
-      rooms: sel.rooms.length,
-      selRoom: sel.room,
-      focus: this._focus,
-    });
-    const targets = new Map<string, Pos>();
-    model.floors.forEach((f, i) => targets.set(`f:${f.id}`, tg.floors[i]));
-    sel.rooms.forEach((r, i) => targets.set(`r:${r.id}`, tg.rooms[i]));
-    const selKey = `${sel.floor ?? ""}|${sel.room ?? ""}`;
-    if (this._focus && this._lastSelKey !== undefined && selKey !== this._lastSelKey) {
-      const parent = sel.floor !== undefined ? tg.floors[sel.floor] : { x: layout.homeX, y: layout.yHome, o: 1 };
-      this._startTween(targets, { x: parent.x, y: parent.y + FLOOR_H / 2, o: 0 });
-    }
-    this._lastSelKey = selKey;
-    const now = performance.now();
-    if (this._tween?.finished(now)) this._tween = undefined;
-    const pos = (id: string): Pos => this._tween?.sample(id, now) ?? targets.get(id) ?? { x: 0, y: 0, o: 0 };
-    const floorViews = model.floors.map((f) => pos(`f:${f.id}`));
-    sel.rooms.forEach((r) => this._lastRooms.set(r.id, r));
-    const roomViews: RoomView[] = sel.rooms.map((r) => ({ room: r, p: pos(`r:${r.id}`), leaving: false }));
-    // rooms of a floor that was just left fade out where they were
-    for (const id of this._tween?.leaving ?? []) {
-      const gone = id.startsWith("r:") ? this._lastRooms.get(id.slice(2)) : undefined;
-      if (gone) roomViews.push({ room: gone, p: pos(id), leaving: true });
-    }
-    this._lastShown = new Map([
-      ...model.floors.map((f, i) => [`f:${f.id}`, floorViews[i]] as const),
-      ...roomViews.map((v) => [`r:${v.room.id}`, v.p] as const),
-    ]);
+    const { floorViews, roomViews } = frame;
 
     return html`
       <ha-card style=${colorVars(cfg.colors)}>
