@@ -21,18 +21,18 @@ export function checkSensor(
   tr: Tr = DE,
 ): string | undefined {
   if (typeof entityId !== "string" || !entityId) return undefined;
-  if (!entityId.startsWith("sensor.")) return tr("Nur sensor.* ist erlaubt");
+  if (!entityId.startsWith("sensor.")) return tr("err_not_sensor");
   const st = states[entityId];
-  if (!st) return tr("Entität nicht gefunden");
+  if (!st) return tr("err_entity_not_found");
   const attrs = st.attributes;
   if (check === "power") {
-    if (attrs.device_class !== "power") return tr("Kein Leistungssensor (device_class: power)");
-    if (!POWER_UNITS.includes(String(attrs.unit_of_measurement))) return tr("Einheit muss W, kW oder MW sein");
+    if (attrs.device_class !== "power") return tr("err_not_power");
+    if (!POWER_UNITS.includes(String(attrs.unit_of_measurement))) return tr("err_power_unit");
   } else if (check === "energy") {
-    if (attrs.device_class !== "energy") return tr("Kein Energiesensor (device_class: energy)");
-    if (!ENERGY_UNITS.includes(String(attrs.unit_of_measurement))) return tr("Einheit muss Wh, kWh oder MWh sein");
+    if (attrs.device_class !== "energy") return tr("err_not_energy");
+    if (!ENERGY_UNITS.includes(String(attrs.unit_of_measurement))) return tr("err_energy_unit");
   } else if (attrs.device_class !== "battery" && attrs.unit_of_measurement !== "%") {
-    return tr("Kein Prozent-/Batteriesensor");
+    return tr("err_not_battery");
   }
   return undefined;
 }
@@ -59,7 +59,7 @@ export function fieldErrors(
 }
 
 export const colorError = (value: unknown, tr: Tr = DE): string | undefined =>
-  isValidColor(value) ? undefined : tr("Ungültige Farbe (z. B. #9184d9)");
+  isValidColor(value) ? undefined : tr("err_invalid_color");
 
 /** Set when the rooms use more power than the configured total sensor reports. */
 export function sumConflict(
@@ -118,6 +118,6 @@ export function contrastWarning(
   if (!text || !bg) return undefined;
   const ratio = contrastRatio(text, bg);
   return ratio < 4.5
-    ? tr("Geringer Kontrast zwischen Text und Hintergrund ({0} : 1, empfohlen ab 4.5 : 1)", ratio.toFixed(1))
+    ? tr("warn_low_contrast", ratio.toFixed(1))
     : undefined;
 }

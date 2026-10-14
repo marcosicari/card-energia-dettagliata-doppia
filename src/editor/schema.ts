@@ -1,4 +1,5 @@
 import { THRESHOLD_LEVELS } from "../model/thresholds";
+import type { EditorKey, Tr } from "../localize/editor";
 
 /**
  * Declarative description of every editor field. Each field maps 1:1 to a config path,
@@ -8,7 +9,9 @@ export interface Field {
   /** dotted path relative to the edited object, e.g. "options.unit" */
   path: string;
   selector: Record<string, unknown>;
-  label: string;
+  label: EditorKey;
+  /** translated options of a select selector, added to `selector.select.options` */
+  options?: Array<{ value: string; label: EditorKey }>;
   required?: boolean;
   /** value shown (and behavior applied) while the option is unset in the config */
   default?: unknown;
@@ -32,7 +35,7 @@ export const COLOR_KEYS = ["accent", "flow", "inactive", "bar", "background", "t
 const customColors = (cfg: any): boolean =>
   cfg?.colors?.preset === "custom" || COLOR_KEYS.some((k) => !!cfg?.colors?.[k]);
 
-const color = (path: string, label: string): Field => ({
+const color = (path: string, label: EditorKey): Field => ({
   path,
   selector: text,
   label,
@@ -41,38 +44,38 @@ const color = (path: string, label: string): Field => ({
 });
 
 /** Quick choices for the color rows; "" means: use the Home Assistant theme. */
-export const PALETTE: Array<{ value: string; label: string }> = [
-  { value: "", label: "Theme" },
-  { value: "var(--primary-color)", label: "Primärfarbe" },
-  { value: "var(--accent-color)", label: "Akzentfarbe" },
-  { value: "#9184d9", label: "Violett" },
-  { value: "#b5abfc", label: "Hellviolett" },
-  { value: "#f2c94c", label: "Gelb" },
-  { value: "#4caf50", label: "Grün" },
-  { value: "#03a9f4", label: "Blau" },
-  { value: "#f44336", label: "Rot" },
-  { value: "#ff9800", label: "Orange" },
-  { value: "#9e9e9e", label: "Grau" },
+export const PALETTE: Array<{ value: string; label: EditorKey }> = [
+  { value: "", label: "color_theme" },
+  { value: "var(--primary-color)", label: "palette_primary" },
+  { value: "var(--accent-color)", label: "palette_accent" },
+  { value: "#9184d9", label: "palette_violet" },
+  { value: "#b5abfc", label: "palette_light_violet" },
+  { value: "#f2c94c", label: "palette_yellow" },
+  { value: "#4caf50", label: "palette_green" },
+  { value: "#03a9f4", label: "palette_blue" },
+  { value: "#f44336", label: "palette_red" },
+  { value: "#ff9800", label: "palette_orange" },
+  { value: "#9e9e9e", label: "palette_gray" },
 ];
 const opts = (values: string[]) => ({ select: { mode: "box", options: values.map((v) => ({ value: v, label: v })) } });
 
 export const GENERAL: Field[] = [
-  { path: "title", selector: text, label: "Titel" },
-  { path: "options.unit", selector: opts(["W", "kW", "auto"]), label: "Einheit", default: "W" },
-  { path: "options.decimals", selector: { number: { min: 0, max: 4, mode: "box" } }, label: "Nachkommastellen", default: 2 },
-  { path: "options.animation", selector: { boolean: {} }, label: "Animation", default: true },
-  { path: "options.show_consumers", selector: { boolean: {} }, label: "Verbraucher-Liste anzeigen", default: true },
+  { path: "title", selector: text, label: "field_title" },
+  { path: "options.unit", selector: opts(["W", "kW", "auto"]), label: "field_unit", default: "W" },
+  { path: "options.decimals", selector: { number: { min: 0, max: 4, mode: "box" } }, label: "field_decimals", default: 2 },
+  { path: "options.animation", selector: { boolean: {} }, label: "field_animation", default: true },
+  { path: "options.show_consumers", selector: { boolean: {} }, label: "field_show_consumers", default: true },
   {
     path: "options.only_active_consumers",
     selector: { boolean: {} },
-    label: "Nur aktive Verbraucher anzeigen (ab 1 W)",
+    label: "field_only_active_consumers",
     default: false,
     when: (cfg: any) => cfg?.options?.show_consumers !== false,
   },
-  { path: "options.show_unassigned", selector: { boolean: {} }, label: "„Nicht erfasst“ anzeigen", default: true, when: (cfg: any) => cfg?.options?.show_consumers !== false },
-  { path: "options.remember_selection", selector: { boolean: {} }, label: "Auswahl merken", default: true },
-  { path: "options.wrap_rooms", selector: { boolean: {} }, label: "Viele Räume in zwei Reihen umbrechen (statt scrollen)", default: false },
-  { path: "options.focus_selected", selector: { boolean: {} }, label: "Gewählte Etage oder gewählten Raum in die Mitte schieben (die anderen blenden aus)", default: false },
+  { path: "options.show_unassigned", selector: { boolean: {} }, label: "field_show_unassigned", default: true, when: (cfg: any) => cfg?.options?.show_consumers !== false },
+  { path: "options.remember_selection", selector: { boolean: {} }, label: "field_remember_selection", default: true },
+  { path: "options.wrap_rooms", selector: { boolean: {} }, label: "field_wrap_rooms", default: false },
+  { path: "options.focus_selected", selector: { boolean: {} }, label: "field_focus_selected", default: false },
 ];
 
 /** Energy mode: only offered once an element has an energy sensor. */
@@ -88,33 +91,24 @@ export const hasEnergySensor = (cfg: any): boolean => {
 export const ENERGY_MODE: Field[] = [
   {
     path: "options.mode",
-    selector: {
-      select: {
-        mode: "dropdown",
-        options: [
-          { value: "power", label: "Leistung (jetzt)" },
-          { value: "energy", label: "Energie (Heute, Woche, Monat)" },
-        ],
-      },
-    },
-    label: "Startansicht",
+    selector: { select: { mode: "dropdown" } },
+    options: [
+      { value: "power", label: "mode_power" },
+      { value: "energy", label: "mode_energy" },
+    ],
+    label: "field_mode",
     default: "power",
     when: hasEnergySensor,
   },
   {
     path: "options.energy_periods",
-    selector: {
-      select: {
-        multiple: true,
-        mode: "list",
-        options: [
-          { value: "today", label: "Heute" },
-          { value: "week", label: "Woche" },
-          { value: "month", label: "Monat" },
-        ],
-      },
-    },
-    label: "Zeiträume im Schalter",
+    selector: { select: { multiple: true, mode: "list" } },
+    options: [
+      { value: "today", label: "period_today" },
+      { value: "week", label: "period_week" },
+      { value: "month", label: "period_month" },
+    ],
+    label: "field_energy_periods",
     default: ["today", "week", "month"],
     multi: true,
     when: hasEnergySensor,
@@ -122,46 +116,46 @@ export const ENERGY_MODE: Field[] = [
 ];
 
 export const COLORS: Field[] = [
-  { path: "colors.preset", selector: opts(["theme", "nocturne", "custom"]), label: "Voreinstellung", default: "theme" },
-  color("colors.accent", "Akzent / Auswahl"),
-  color("colors.flow", "Fluss-Linien"),
-  color("colors.inactive", "Inaktive Linien"),
-  color("colors.bar", "Verbraucher-Balken"),
-  color("colors.background", "Hintergrund (leer = transparent)"),
-  color("colors.text", "Text (leer = Theme)"),
+  { path: "colors.preset", selector: opts(["theme", "nocturne", "custom"]), label: "field_color_preset", default: "theme" },
+  color("colors.accent", "field_color_accent"),
+  color("colors.flow", "field_color_flow"),
+  color("colors.inactive", "field_color_inactive"),
+  color("colors.bar", "field_color_bar"),
+  color("colors.background", "field_color_background"),
+  color("colors.text", "field_color_text"),
 ];
 
 /** One color range: from `from` watts upwards lines and bars use `color`. */
 export const THRESHOLD: Field[] = [
-  { path: "from", selector: { number: { min: 0, mode: "box", unit_of_measurement: "W" } }, label: "ab (W)", required: true },
-  color("color", "Farbe"),
+  { path: "from", selector: { number: { min: 0, mode: "box", unit_of_measurement: "W" } }, label: "field_thr_from", required: true },
+  color("color", "field_color"),
   {
     path: "width",
     selector: { number: { min: 0.5, max: 12, step: 0.5, mode: "box", unit_of_measurement: "px" } },
-    label: "Strichstärke (px, leer = automatisch)",
+    label: "field_thr_width",
   },
 ];
 
 export const HOME: Field[] = [
-  { path: "home.total_entity", selector: power, label: "Gesamt-Sensor (optional)", check: "power" },
-  { path: "home.total_energy_entity", selector: energy, label: "Gesamt-Energiesensor (optional, kWh)", check: "energy" },
+  { path: "home.total_entity", selector: power, label: "field_total_entity", check: "power" },
+  { path: "home.total_energy_entity", selector: energy, label: "field_total_energy_entity", check: "energy" },
 ];
 
 export const SOURCE: Field[] = [
-  { path: "entity", selector: power, label: "Sensor", required: true, check: "power" },
-  { path: "energy_entity", selector: energy, label: "Energiesensor (kWh, optional)", check: "energy" },
-  { path: "type", selector: opts(["solar", "battery", "grid", "generic"]), label: "Typ" },
-  { path: "name", selector: text, label: "Name" },
-  { path: "icon", selector: icon, label: "Icon" },
-  color("color", "Farbe"),
+  { path: "entity", selector: power, label: "field_sensor", required: true, check: "power" },
+  { path: "energy_entity", selector: energy, label: "field_energy_entity", check: "energy" },
+  { path: "type", selector: opts(["solar", "battery", "grid", "generic"]), label: "field_type" },
+  { path: "name", selector: text, label: "field_name" },
+  { path: "icon", selector: icon, label: "field_icon" },
+  color("color", "field_color"),
   {
     path: "soc_entity",
     selector: { entity: { domain: "sensor" } },
-    label: "Ladezustand (SoC)",
+    label: "field_soc",
     check: "battery",
     when: (s) => s?.type === "battery",
   },
-  { path: "invert", selector: { boolean: {} }, label: "Vorzeichen invertieren" },
+  { path: "invert", selector: { boolean: {} }, label: "field_invert" },
 ];
 
 export interface Choice {
@@ -172,14 +166,14 @@ const dropdown = (choices: Choice[]) => ({ select: { mode: "dropdown", options: 
 
 /** Floors can only be picked from the Home Assistant floor registry. */
 export const floorFields = (choices: Choice[] = []): Field[] => [
-  { path: "floor_id", selector: dropdown(choices), label: "Etage", required: true },
-  color("color", "Farbe"),
+  { path: "floor_id", selector: dropdown(choices), label: "field_floor", required: true },
+  color("color", "field_color"),
 ];
 
 /** Rooms can only be picked from the Home Assistant area registry. */
 export const roomFields = (choices: Choice[] = []): Field[] => [
-  { path: "area_id", selector: dropdown(choices), label: "Bereich (Raum)", required: true },
-  color("color", "Farbe"),
+  { path: "area_id", selector: dropdown(choices), label: "field_area", required: true },
+  color("color", "field_color"),
 ];
 
 /** Consumer sensors: power sensors that are not yet assigned to another consumer. */
@@ -187,33 +181,34 @@ export const consumerFields = (exclude: string[] = []): Field[] => [
   {
     path: "entity",
     selector: { entity: { domain: "sensor", device_class: "power", exclude_entities: exclude } },
-    label: "Sensor",
+    label: "field_sensor",
     required: true,
     check: "power",
   },
-  { path: "energy_entity", selector: energy, label: "Energiesensor (kWh, optional)", check: "energy" },
-  { path: "name", selector: text, label: "Name (optional)" },
+  { path: "energy_entity", selector: energy, label: "field_energy_entity", check: "energy" },
+  { path: "name", selector: text, label: "field_name_optional" },
 ];
 
 export const CONSUMER: Field[] = consumerFields();
 
 /** Builds the ha-form schema for the fields visible for `obj`. */
-export function toSchema(fields: Field[], obj: unknown, tr: (s: string) => string = (s) => s) {
+export function toSchema(fields: Field[], obj: unknown, tr: Tr) {
   return fields
     .filter((f) => !f.when || f.when(obj))
-    .map((f) => ({ name: f.path, selector: translateOptions(f.selector, tr), required: f.required }));
+    .map((f) => ({ name: f.path, selector: withOptions(f, tr), required: f.required }));
 }
 
-/** Option labels of a select are translated like every other label. */
-function translateOptions(selector: Record<string, unknown>, tr: (s: string) => string): Record<string, unknown> {
-  const select = selector.select as { options?: Array<{ value: string; label: string }> } | undefined;
-  if (!select?.options) return selector;
-  return { ...selector, select: { ...select, options: select.options.map((o) => ({ ...o, label: tr(o.label) })) } };
+/** Adds the translated `options` of a field to its select selector. */
+function withOptions(f: Field, tr: Tr): Record<string, unknown> {
+  if (!f.options) return f.selector;
+  const select = f.selector.select as Record<string, unknown>;
+  return { ...f.selector, select: { ...select, options: f.options.map((o) => ({ ...o, label: tr(o.label) })) } };
 }
 
 /** Translates a field-path -> label lookup for ha-form's computeLabel. */
-export function labelFor(fields: Field[], name: string, tr: (s: string) => string = (s) => s): string {
-  return tr(fields.find((f) => f.path === name)?.label ?? name);
+export function labelFor(fields: Field[], name: string, tr: Tr): string {
+  const field = fields.find((f) => f.path === name);
+  return field ? tr(field.label) : name;
 }
 
 /**

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Internal
+
+- Editor texts are looked up by typed keys (`section_general`, `thr_insert_defaults`, ...) instead of the German text. German and English share one key type, so a missing translation or a mistyped key fails the type check. No visible change: every text is the same in both languages.
+
 ## 1.0.1
 
 ### Fixed

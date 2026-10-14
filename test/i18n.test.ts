@@ -1,42 +1,39 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { editorKeys, makeTr } from "../src/localize/editor";
-import { COLORS, CONSUMER, ENERGY_MODE, GENERAL, HOME, PALETTE, SOURCE, THRESHOLD, floorFields, roomFields } from "../src/editor/schema";
+import { makeTr } from "../src/localize/editor";
 import { checkSensor, contrastWarning } from "../src/editor/validation";
 import { sourceNames } from "../src/localize";
 import { computeModel } from "../src/model/compute";
 import type { EnergyCardConfig } from "../src/model/config";
 
+// Missing translations and unknown keys are compile errors (`en: typeof de`, `EditorKey`).
 describe("editor translations", () => {
-  const keys = new Set(editorKeys());
-
-  it("translates every field label and palette entry", () => {
-    const labels = [...GENERAL, ...ENERGY_MODE, ...COLORS, ...HOME, ...THRESHOLD, ...SOURCE, ...floorFields(), ...roomFields(), ...CONSUMER].map((f) => f.label);
-    const missing = [...labels, ...PALETTE.map((c) => c.label)].filter((l) => l && l !== "Theme" && !keys.has(l));
-    expect(missing).toEqual([]);
-  });
-
-  it("translates every string the editor passes to _tr()", () => {
-    const src = readFileSync("src/editor/card-editor.ts", "utf8");
-    const used = [...src.matchAll(/_tr\(\s*"([^"]*)"/g)].map((m) => m[1]);
-    expect(used.length).toBeGreaterThan(15);
-    expect(used.filter((u) => !keys.has(u))).toEqual([]);
-  });
-
   it("translates the validation messages", () => {
     const en = makeTr("en");
     const states = { "sensor.t": { state: "1", attributes: { device_class: "temperature" } } };
     expect(checkSensor(states, "sensor.t", "power", en)).toBe("Not a power sensor (device_class: power)");
     expect(checkSensor(states, "sensor.gone", "power", en)).toBe("Entity not found");
+    expect(checkSensor(states, "sensor.gone", "power")).toBe("Entität nicht gefunden");
     expect(contrastWarning({ text: "#777", background: "#888" }, undefined, undefined, en)).toMatch(/^Low contrast/);
   });
 
   it("uses German for de and English otherwise, and fills placeholders", () => {
-    expect(makeTr("de")("Stromquellen ({0})", 3)).toBe("Stromquellen (3)");
-    expect(makeTr("de-AT")("Farben")).toBe("Farben");
-    expect(makeTr("en")("Stromquellen ({0})", 3)).toBe("Power sources (3)");
-    expect(makeTr(undefined)("Farben")).toBe("Colors");
-    expect(makeTr("fr")("Unbekannt")).toBe("Unbekannt");
+    expect(makeTr("de")("section_sources", 3)).toBe("Stromquellen (3)");
+    expect(makeTr("de-AT")("section_colors")).toBe("Farben");
+    expect(makeTr("en")("section_sources", 3)).toBe("Power sources (3)");
+    expect(makeTr(undefined)("section_colors")).toBe("Colors");
+    expect(makeTr("fr")("section_colors")).toBe("Colors");
+    expect(makeTr("en")("warn_duplicate_entity", "sensor.a")).toBe("sensor.a is assigned more than once: ");
+  });
+
+  it("leaves no German text in the editor sources", () => {
+    const dir = "src/editor";
+    const german = readdirSync(dir)
+      .filter((n) => n.endsWith(".ts"))
+      .flatMap((n) => readFileSync(`${dir}/${n}`, "utf8").split("\n").map((line, i) => [`${n}:${i + 1}`, line]))
+      .filter(([, line]) => /[äöüÄÖÜß„“]/.test(line))
+      .map(([at]) => at);
+    expect(german).toEqual([]);
   });
 });
 

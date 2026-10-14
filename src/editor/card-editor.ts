@@ -45,7 +45,7 @@ import {
 import { colorError, contrastWarning, fieldErrors, sumConflict } from "./validation";
 import { defineOnce } from "../register";
 import { hassChangedForEditor, type EditorHass } from "./hass-change";
-import { makeTr, type Tr } from "../localize/editor";
+import { makeTr, type EditorKey, type Tr } from "../localize/editor";
 
 interface Hass {
   states: Record<string, unknown>;
@@ -53,12 +53,12 @@ interface Hass {
   [k: string]: unknown;
 }
 
-const LEVEL_LABEL: Record<"all" | ThresholdLevel, string> = {
-  all: "Alle",
-  source: "Quellen",
-  floor: "Etagen",
-  room: "Räume",
-  consumer: "Verbraucher",
+const LEVEL_LABEL: Record<"all" | ThresholdLevel, EditorKey> = {
+  all: "level_all",
+  source: "level_source",
+  floor: "level_floor",
+  room: "level_room",
+  consumer: "level_consumer",
 };
 
 /** Visual editor: every config option has a field (see schema.ts and the coverage test). */
@@ -374,7 +374,7 @@ export class DetailedEnergyCardEditor extends LitElement {
     // A sensor may belong to one consumer only; the picker hides taken ones, this catches the rest.
     if (ptr.includes("consumers") && typeof data.entity === "string" && data.entity) {
       if (consumerEntitiesExcept(this._config, ptr).includes(data.entity)) {
-        this._notice = this._tr("Dieser Sensor ist bereits einem Verbraucher zugewiesen.");
+        this._notice = this._tr("warn_sensor_assigned");
         return;
       }
     }
@@ -410,7 +410,7 @@ export class DetailedEnergyCardEditor extends LitElement {
       this._emit(toggleFloors(cfg, true, areas));
       if (left.length) {
         this._notice = this._tr(
-          "Räume ohne Etage wurden ausgeblendet: {0}. Etagen wieder auszuschalten stellt sie wieder her.",
+          "warn_rooms_hidden",
           left.map((r) => this._areaName(r.area_id)).join(", "),
         );
       }
@@ -472,11 +472,11 @@ export class DetailedEnergyCardEditor extends LitElement {
         )}
       </div>
       <div class="inputs">
-        <input type="color" title=${this._tr("Eigene Farbe wählen")} aria-label=${this._tr("Eigene Farbe wählen")} .value=${swatch}
+        <input type="color" title=${this._tr("color_pick")} aria-label=${this._tr("color_pick")} .value=${swatch}
           @input=${(e: Event) => set((e.target as HTMLInputElement).value)} />
-        <input type="text" placeholder="Theme" .value=${text}
+        <input type="text" placeholder=${this._tr("color_theme")} .value=${text}
           @change=${(e: Event) => set((e.target as HTMLInputElement).value.trim())} />
-        <button class="icon" title=${this._tr("Zurücksetzen auf Theme")} aria-label=${this._tr("Zurücksetzen auf Theme")} ?disabled=${!text} @click=${() => set("")}>↺</button>
+        <button class="icon" title=${this._tr("color_reset")} aria-label=${this._tr("color_reset")} ?disabled=${!text} @click=${() => set("")}>↺</button>
       </div>
       ${error ? html`<div class="warn">${error}</div>` : nothing}
     </div>`;
@@ -497,7 +497,7 @@ export class DetailedEnergyCardEditor extends LitElement {
       const a = top(upper);
       const b = top(lower);
       if (a !== undefined && b !== undefined && b > a) {
-        out.push(this._tr("Schwellwerte: „{0}“ liegt über „{1}“, obwohl diese Ebene weiter oben liegt.", this._tr(LEVEL_LABEL[lower]), this._tr(LEVEL_LABEL[upper])));
+        out.push(this._tr("warn_thr_level_order", this._tr(LEVEL_LABEL[lower]), this._tr(LEVEL_LABEL[upper])));
       }
     });
     return out;
@@ -522,7 +522,7 @@ export class DetailedEnergyCardEditor extends LitElement {
     };
     return html`
       ${list.length === 0 && fallback.length > 0
-        ? html`<div class="hint">${this._tr("Hier gelten die Werte der übergeordneten Liste.")}</div>`
+        ? html`<div class="hint">${this._tr("thr_inherited_hint")}</div>`
         : nothing}
       ${list.map((t, i) => {
         const key = `${prefix}.${i}.t`;
@@ -531,9 +531,9 @@ export class DetailedEnergyCardEditor extends LitElement {
           <div class="head">
             <button class="title" aria-expanded=${open ? "true" : "false"} @click=${() => this._toggleOpen(key)}>
               ${open ? "▾" : "▸"} <span class="chip" style=${`background:${t.color || "transparent"}`}></span>
-              ${this._tr("ab {0} W", t.from ?? 0)}${typeof t.width === "number" ? html`<small>${t.width} px</small>` : nothing}
+              ${this._tr("thr_from", t.from ?? 0)}${typeof t.width === "number" ? html`<small>${t.width} px</small>` : nothing}
             </button>
-            <button class="icon" title=${this._tr("Entfernen")} aria-label=${this._tr("Entfernen")}
+            <button class="icon" title=${this._tr("remove")} aria-label=${this._tr("remove")}
               @click=${() => {
                 this._closeKeys(prefix);
                 set(removeItem(list, i));
@@ -545,26 +545,26 @@ export class DetailedEnergyCardEditor extends LitElement {
       <button class="add" @click=${() => {
         this._open = new Set(this._open).add(`${prefix}.${list.length}.t`);
         set([...list, next()]);
-      }}>${this._tr("+ Schwellwert")}</button>
+      }}>${this._tr("thr_add")}</button>
       ${list.length === 0
-        ? html`<button class="add" @click=${() => set(defaults.map((t) => ({ ...t })))}>${this._tr("Ampel-Werte einfügen")}</button>`
+        ? html`<button class="add" @click=${() => set(defaults.map((t) => ({ ...t })))}>${this._tr("thr_insert_defaults")}</button>`
         : nothing}
       ${fallback.length > 0
-        ? html`<button class="add" @click=${() => set(fallback.map((t) => ({ ...t })))}>${this._tr("Von der übergeordneten Liste übernehmen")}</button>`
+        ? html`<button class="add" @click=${() => set(fallback.map((t) => ({ ...t })))}>${this._tr("thr_copy_parent")}</button>`
         : nothing}
       ${list.length > 0 || fallback.length > 0
         ? html`<div class="scale">
-            <label>${this._tr("Faktor")}
+            <label>${this._tr("thr_factor")}
               <input type="number" min="0.1" step="0.1" .value=${String(this._scale)}
                 @change=${(e: Event) => {
                   const v = Number((e.target as HTMLInputElement).value);
                   if (Number.isFinite(v) && v > 0) this._scale = v;
                 }} />
             </label>
-            <button class="add" @click=${scale}>${this._tr("Grenzen skalieren")}</button>
+            <button class="add" @click=${scale}>${this._tr("thr_scale")}</button>
           </div>`
         : nothing}
-      ${dups.map((d) => html`<div class="warn">⚠ ${this._tr("Mehrere Schwellwerte ab {0} W: nur einer davon gilt.", d)}</div>`)}
+      ${dups.map((d) => html`<div class="warn">⚠ ${this._tr("warn_thr_duplicate", d)}</div>`)}
     `;
   }
 
@@ -579,7 +579,7 @@ export class DetailedEnergyCardEditor extends LitElement {
     return html`
       <div class="own-thresholds">
         <button class="title section" aria-expanded=${open ? "true" : "false"} @click=${() => this._toggleOpen(key)}>
-          ${open ? "▾" : "▸"} ${this._tr("Schwellwerte (Farbe nach Leistung)")}<small>${this._tr("{0} Stufen", count)}</small>
+          ${open ? "▾" : "▸"} ${this._tr("thr_title")}<small>${this._tr("thr_count", count)}</small>
         </button>
       </div>
       ${open ? this._thresholdBody(level, shared, path) : nothing}
@@ -588,8 +588,8 @@ export class DetailedEnergyCardEditor extends LitElement {
 
   private _thresholdBody(level: "all" | ThresholdLevel, shared: ThresholdConfig[], path: string): TemplateResult {
     return html`
-      <div class="hint">${this._tr("Ab dem jeweiligen Wert (in W) bekommen Linien und Balken diese Farbe, darunter gilt die normale Farbe.")}</div>
-      <div class="hint">${this._tr("Optional gibt eine Stufe auch die Strichstärke vor. Jede Ebene kann eigene Werte haben, sonst gelten die Werte für „Alle“.")}</div>
+      <div class="hint">${this._tr("thr_hint")}</div>
+      <div class="hint">${this._tr("thr_width_hint")}</div>
       <div class="levels">
         ${(["all", ...THRESHOLD_LEVELS] as const).map(
           (l) => html`<button class="add ${l === level ? "on" : ""}" aria-pressed=${l === level ? "true" : "false"}
@@ -614,10 +614,10 @@ export class DetailedEnergyCardEditor extends LitElement {
     const levelList = c?.level_thresholds?.[level] ?? c?.thresholds ?? [];
     return html`<div class="own-thresholds">
       <button class="title" aria-expanded=${this._open.has(key) ? "true" : "false"} @click=${() => this._toggleOpen(key)}>
-        ${this._open.has(key) ? "▾" : "▸"} ${this._tr("Eigene Schwellwerte ({0})", own.length)}
+        ${this._open.has(key) ? "▾" : "▸"} ${this._tr("thr_own", own.length)}
       </button>
       ${this._open.has(key)
-        ? html`<div class="hint">${this._tr("Ersetzt für dieses Element die Werte der Ebene.")}</div>
+        ? html`<div class="hint">${this._tr("thr_own_hint")}</div>
             ${this._thresholdEditor(ptr, "thresholds", DEFAULT_LEVEL_THRESHOLDS[level], levelList)}`
         : nothing}
     </div>`;
@@ -628,7 +628,7 @@ export class DetailedEnergyCardEditor extends LitElement {
   private _drag?: { list: string; index: number };
 
   private _handle(listPtr: Pointer, index: number): TemplateResult {
-    return html`<span class="handle" draggable="true" title=${this._tr("Ziehen zum Sortieren")}
+    return html`<span class="handle" draggable="true" title=${this._tr("drag_to_sort")}
       @dragstart=${(e: DragEvent) => this._onDragStart(e, listPtr, index)}
       @dragend=${() => (this._drag = undefined)}>⠿</span>`;
   }
@@ -662,11 +662,11 @@ export class DetailedEnergyCardEditor extends LitElement {
       <button class="title" @click=${() => this._toggleOpen(key)}>
         ${this._open.has(key) ? "▾" : "▸"} ${title}<small>${sub}</small>
       </button>
-      <button class="icon" title=${this._tr("Nach oben")} aria-label=${this._tr("Nach oben")} ?disabled=${index === 0}
+      <button class="icon" title=${this._tr("move_up")} aria-label=${this._tr("move_up")} ?disabled=${index === 0}
         @click=${() => this._update(listPtr, (l) => moveItem(l, index, -1))}>↑</button>
-      <button class="icon" title=${this._tr("Nach unten")} aria-label=${this._tr("Nach unten")} ?disabled=${index === count - 1}
+      <button class="icon" title=${this._tr("move_down")} aria-label=${this._tr("move_down")} ?disabled=${index === count - 1}
         @click=${() => this._update(listPtr, (l) => moveItem(l, index, 1))}>↓</button>
-      <button class="icon" title=${this._tr("Entfernen")} aria-label=${this._tr("Entfernen")}
+      <button class="icon" title=${this._tr("remove")} aria-label=${this._tr("remove")}
         @click=${() => this._update(listPtr, (l) => removeItem(l, index))}>✕</button>
     </div>`;
   }
@@ -675,16 +675,16 @@ export class DetailedEnergyCardEditor extends LitElement {
     const sources = this._config?.sources ?? [];
     return html`
       <section>
-        <h3>${this._tr("Stromquellen ({0})", sources.length)}</h3>
+        <h3>${this._tr("section_sources", sources.length)}</h3>
         ${sources.map((s: SourceConfig, i) => {
           const ptr: Pointer = ["sources", i];
           const key = `s${i}`;
           return html`<div class="item" @dragover=${(e: DragEvent) => this._onOver(e, ["sources"])} @drop=${(e: DragEvent) => this._onDrop(e, ["sources"], i)}>
-            ${this._itemHead(key, s.name ?? s.type ?? this._tr("Quelle"), s.entity ?? "", ptr, i, sources.length)}
+            ${this._itemHead(key, s.name ?? s.type ?? this._tr("source_default_name"), s.entity ?? "", ptr, i, sources.length)}
             ${this._open.has(key) ? html`${this._form(ptr, SOURCE)}${this._elementThresholds(ptr, "source")}` : nothing}
           </div>`;
         })}
-        <button class="add" @click=${() => this._addSource()}>${this._tr("+ Quelle hinzufügen")}</button>
+        <button class="add" @click=${() => this._addSource()}>${this._tr("add_source")}</button>
       </section>
     `;
   }
@@ -697,18 +697,18 @@ export class DetailedEnergyCardEditor extends LitElement {
   private _renderConsumers(roomPtr: Pointer): TemplateResult {
     const consumers = getIn(this._config, [...roomPtr, "consumers"]) ?? [];
     return html`
-      <h3>${this._tr("Verbraucher ({0})", consumers.length)}</h3>
+      <h3>${this._tr("section_consumers", consumers.length)}</h3>
       ${consumers.map((_c: unknown, i: number) => {
         const ptr: Pointer = [...roomPtr, "consumers", i];
         return html`<div class="item" @dragover=${(e: DragEvent) => this._onOver(e, [...roomPtr, "consumers"])} @drop=${(e: DragEvent) => this._onDrop(e, [...roomPtr, "consumers"], i)}>
           <div class="head">
             ${this._handle([...roomPtr, "consumers"], i)}
             <div class="title" style="flex:1">${this._form(ptr, consumerFields(consumerEntitiesExcept(this._config, ptr)))}</div>
-            <button class="icon" title=${this._tr("Nach oben")} aria-label=${this._tr("Nach oben")} ?disabled=${i === 0}
+            <button class="icon" title=${this._tr("move_up")} aria-label=${this._tr("move_up")} ?disabled=${i === 0}
               @click=${() => this._update([...roomPtr, "consumers"], (l) => moveItem(l, i, -1))}>↑</button>
-            <button class="icon" title=${this._tr("Nach unten")} aria-label=${this._tr("Nach unten")} ?disabled=${i === consumers.length - 1}
+            <button class="icon" title=${this._tr("move_down")} aria-label=${this._tr("move_down")} ?disabled=${i === consumers.length - 1}
               @click=${() => this._update([...roomPtr, "consumers"], (l) => moveItem(l, i, 1))}>↓</button>
-            <button class="icon" title=${this._tr("Entfernen")} aria-label=${this._tr("Entfernen")}
+            <button class="icon" title=${this._tr("remove")} aria-label=${this._tr("remove")}
               @click=${() => this._update([...roomPtr, "consumers"], (l) => removeItem(l, i))}>✕</button>
           </div>
           ${this._elementThresholds(ptr, "consumer")}
@@ -716,7 +716,7 @@ export class DetailedEnergyCardEditor extends LitElement {
       })}
       <button class="add"
         @click=${() => this._update([...roomPtr, "consumers"], (l) => [...(l ?? []), { entity: "" }])}>
-        ${this._tr("+ Verbraucher")}
+        ${this._tr("add_consumer")}
       </button>
     `;
   }
@@ -729,15 +729,15 @@ export class DetailedEnergyCardEditor extends LitElement {
         const ptr: Pointer = [...listPtr, i];
         const key = ptr.join(".");
         return html`<div class="item ${nested ? "nested" : ""}" @dragover=${(e: DragEvent) => this._onOver(e, listPtr)} @drop=${(e: DragEvent) => this._onDrop(e, listPtr, i)}>
-          ${this._itemHead(key, this._areaName(r.area_id), this._tr("{0} Verbraucher", r.consumers?.length ?? 0), ptr, i, rooms.length)}
+          ${this._itemHead(key, this._areaName(r.area_id), this._tr("count_consumers", r.consumers?.length ?? 0), ptr, i, rooms.length)}
           ${this._open.has(key)
             ? html`${this._form(ptr, roomFields(this._areaOptions(floorId, r.area_id)))}${this._elementThresholds(ptr, "room")}${this._renderConsumers(ptr)}`
             : nothing}
         </div>`;
       })}
-      <button class="add" ?disabled=${!free.length} @click=${() => this._addRoom(listPtr, free[0].value)}>${this._tr("+ Raum")}</button>
+      <button class="add" ?disabled=${!free.length} @click=${() => this._addRoom(listPtr, free[0].value)}>${this._tr("add_room")}</button>
       ${this._reg && !free.length
-        ? html`<div class="warn">${this._tr("Keine weiteren Bereiche in Home Assistant verfügbar.")}</div>`
+        ? html`<div class="warn">${this._tr("warn_no_more_areas")}</div>`
         : nothing}
     `;
   }
@@ -755,8 +755,8 @@ export class DetailedEnergyCardEditor extends LitElement {
     const freeFloors = this._floorChoices("");
     return html`
       <section>
-        <h3>${this._tr("Struktur")}</h3>
-        <ha-formfield .label=${this._tr("Etagen verwenden")}>
+        <h3>${this._tr("section_structure")}</h3>
+        <ha-formfield .label=${this._tr("use_floors")}>
           <ha-switch
             .checked=${useFloors}
             .disabled=${!useFloors && !this._reg}
@@ -769,7 +769,7 @@ export class DetailedEnergyCardEditor extends LitElement {
                 const ptr: Pointer = ["floors", i];
                 const key = ptr.join(".");
                 return html`<div class="item" @dragover=${(e: DragEvent) => this._onOver(e, ["floors"])} @drop=${(e: DragEvent) => this._onDrop(e, ["floors"], i)}>
-                  ${this._itemHead(key, this._floorName(f.floor_id), this._tr("{0} Räume", f.rooms?.length ?? 0), ptr, i, floors.length)}
+                  ${this._itemHead(key, this._floorName(f.floor_id), this._tr("count_rooms", f.rooms?.length ?? 0), ptr, i, floors.length)}
                   ${this._open.has(key)
                     ? html`${this._form(ptr, floorFields(this._floorChoices(f.floor_id)))}${this._elementThresholds(ptr, "floor")}${this._renderRooms([...ptr, "rooms"], true, f.floor_id)}`
                     : nothing}
@@ -777,10 +777,10 @@ export class DetailedEnergyCardEditor extends LitElement {
               })}
               <button class="add" ?disabled=${!freeFloors.length}
                 @click=${() => this._update(["floors"], (l) => [...(l ?? []), { floor_id: freeFloors[0].value, rooms: [] }])}>
-                ${this._tr("+ Etage")}
+                ${this._tr("add_floor")}
               </button>
               ${this._reg && !freeFloors.length
-                ? html`<div class="warn">${this._tr("Keine weiteren Etagen in Home Assistant angelegt.")}</div>`
+                ? html`<div class="warn">${this._tr("warn_no_more_floors")}</div>`
                 : nothing}`
           : this._renderRooms(["rooms"], false)}
       </section>
@@ -799,16 +799,16 @@ export class DetailedEnergyCardEditor extends LitElement {
     );
     const conflict = sumConflict(this._config, (this.hass?.states ?? {}) as Record<string, StateLike | undefined>);
     return html`
-      <section><h3>${this._tr("Allgemein")}</h3>${this._form([], GENERAL)}${this._form([], ENERGY_MODE)}</section>
-      <section><h3>${this._tr("Farben")}</h3>${this._form([], COLORS)}${this._renderThresholds()}${contrast ? html`<div class="warn">⚠ ${contrast}</div>` : nothing}</section>
-      <section><h3>${this._tr("Zuhause")}</h3>${this._form([], HOME)}</section>
+      <section><h3>${this._tr("section_general")}</h3>${this._form([], GENERAL)}${this._form([], ENERGY_MODE)}</section>
+      <section><h3>${this._tr("section_colors")}</h3>${this._form([], COLORS)}${this._renderThresholds()}${contrast ? html`<div class="warn">⚠ ${contrast}</div>` : nothing}</section>
+      <section><h3>${this._tr("section_home")}</h3>${this._form([], HOME)}</section>
       ${this._renderSources()} ${this._renderStructure()}
       ${this._notice ? html`<div class="warn">⚠ ${this._notice}</div>` : nothing}
       ${conflict
-        ? html`<div class="warn">⚠ ${this._tr("Die Räume verbrauchen zusammen {0} W, mehr als der Gesamt-Sensor ({1} W). „Nicht erfasst“ wird nicht angezeigt.", Math.round(conflict.rooms), Math.round(conflict.total))}</div>`
+        ? html`<div class="warn">⚠ ${this._tr("warn_sum_conflict", Math.round(conflict.rooms), Math.round(conflict.total))}</div>`
         : nothing}
       ${dups.map(
-        (d) => html`<div class="warn">⚠ ${this._tr("{0} ist mehrfach zugeordnet: {1}", d.entity, d.places.join(", "))}</div>`,
+        (d) => html`<div class="warn">⚠ ${this._tr("warn_duplicate_entity", d.entity, d.places.join(", "))}</div>`,
       )}
     `;
   }
