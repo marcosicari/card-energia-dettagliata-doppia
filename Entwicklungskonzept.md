@@ -353,6 +353,7 @@ Alle Farben sind anpassbar, im visuellen Editor (Bereich „Farben“) und per Y
 | **1.0.2** | Interne Umstellung: Editor-Texte über typisierte Schlüssel statt deutscher Texte, keine sichtbare Änderung. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.1.0** | Neue Option `options.storage_id` (trennt Karten mit gleicher Struktur), Auswahl-Schlüssel ohne Hash (die gemerkte Auswahl wird einmal zurückgesetzt). Korrekturen: Energiewerte werden nach Wiederanhängen und Sichtbarwerden neu geladen, doppelte `energy_entity` im Editor, Wochenstart bei `first_weekday: language`, Hinweise zu Energiesensoren im Editor, Nachkommastellen-Feld ohne falschen Standardwert. `render()` ohne Seiteneffekte. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **HACS-Standard** | Aufnahme in den HACS-Standard-Store (`hacs/default`) mit Version 1.1.0: Installation direkt über die HACS-Suche, kein benutzerdefiniertes Repository mehr nötig |
+| **1.1.1** | Doku: Installation über den HACS-Standard-Store statt Custom Repository, damit HACS die neue README anzeigt. Details in [CHANGELOG.md](CHANGELOG.md) |
 
 ---
 

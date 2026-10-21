@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.1
+
+### Documentation
+
+- The card is now in the HACS default store. The README describes installing it from the HACS search instead of a custom repository, and the section about the rename from `energy-card` is removed. This release brings the new README to HACS.
+
+### Internal
+
+- Updated dev dependencies and GitHub Actions (Dependabot).
+
 ## 1.1.0
 
 ### Added
