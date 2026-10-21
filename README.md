@@ -42,19 +42,16 @@ The editor screenshots are rendered from demo data with `npm run screenshots`. T
 
 ## Install (HACS)
 
+The card is part of the HACS default store, so no custom repository is needed.
+
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=stacknoise&repository=detailed-energy-card&category=plugin)
 
-Click the button above to add the repository to HACS on your Home Assistant instance, or do it manually:
+Click the button above to open the card in HACS on your Home Assistant instance, or find it yourself:
 
-1. Open HACS → ⋮ → **Custom repositories**.
-2. Enter `https://github.com/stacknoise/detailed-energy-card` and choose the type **Dashboard**.
-3. Search for *Detailed Energy Card* in HACS and click **Download**.
-4. Reload the browser. HACS registers the resource `/hacsfiles/detailed-energy-card/detailed-energy-card.js` automatically.
-5. Add the card to a dashboard: **Add card → Detailed Energy Card**, or use `type: custom:detailed-energy-card` in YAML.
-
-## Renamed from `energy-card`
-
-The card was renamed to `detailed-energy-card` (HACS needs the file name to match the repository name). Existing dashboards must change `type: custom:energy-card` to `type: custom:detailed-energy-card`. In HACS remove the old *Energy Card* entry and add `https://github.com/stacknoise/detailed-energy-card` as custom repository; the old resource `/hacsfiles/energy-card/energy-card.js` can be deleted from the dashboard resources. The stored room selection is reset once.
+1. Open HACS and search for *Detailed Energy Card*.
+2. Open the entry and click **Download**.
+3. Reload the browser. HACS registers the resource `/hacsfiles/detailed-energy-card/detailed-energy-card.js` automatically.
+4. Add the card to a dashboard: **Add card → Detailed Energy Card**, or use `type: custom:detailed-energy-card` in YAML.
 
 ## Example
 

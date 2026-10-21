@@ -352,6 +352,7 @@ Alle Farben sind anpassbar, im visuellen Editor (Bereich „Farben“) und per Y
 | **1.0.1** | Editor-Stil im dunklen Theme, doppelte `energy_entity` wird abgelehnt, neue Screenshots. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.0.2** | Interne Umstellung: Editor-Texte über typisierte Schlüssel statt deutscher Texte, keine sichtbare Änderung. Details in [CHANGELOG.md](CHANGELOG.md) |
 | **1.1.0** | Neue Option `options.storage_id` (trennt Karten mit gleicher Struktur), Auswahl-Schlüssel ohne Hash (die gemerkte Auswahl wird einmal zurückgesetzt). Korrekturen: Energiewerte werden nach Wiederanhängen und Sichtbarwerden neu geladen, doppelte `energy_entity` im Editor, Wochenstart bei `first_weekday: language`, Hinweise zu Energiesensoren im Editor, Nachkommastellen-Feld ohne falschen Standardwert. `render()` ohne Seiteneffekte. Details in [CHANGELOG.md](CHANGELOG.md) |
+| **HACS-Standard** | Aufnahme in den HACS-Standard-Store (`hacs/default`) mit Version 1.1.0: Installation direkt über die HACS-Suche, kein benutzerdefiniertes Repository mehr nötig |
 
 ---
 
@@ -396,8 +397,10 @@ detailed-energy-card/
 
 **Installation für Nutzer**
 
-1. *Vor Aufnahme in den HACS-Standard:* HACS → ⋮ → Benutzerdefinierte Repositories → URL eintragen, Typ „Dashboard“.
-2. „Detailed Energy Card“ suchen → Herunterladen.
+Die Karte ist im HACS-Standard-Store (`hacs/default`) aufgenommen, ein benutzerdefiniertes Repository ist nicht mehr nötig.
+
+1. HACS öffnen und „Detailed Energy Card“ suchen (oder über den my.home-assistant-Link aus der README direkt öffnen).
+2. Den Eintrag öffnen → Herunterladen.
 3. HACS registriert die Ressource `/hacsfiles/detailed-energy-card/detailed-energy-card.js` automatisch als JavaScript-Modul.
 4. Im Dashboard Karte hinzufügen → „Detailed Energy Card“, oder per YAML `type: custom:detailed-energy-card`.
 
@@ -416,7 +419,7 @@ registerCardOnce(window.customCards, {
 });
 ```
 
-**Release-Ablauf:** Version in `package.json` erhöhen und `CHANGELOG.md` ergänzen, mergen, dann Tag `vX.Y.Z` pushen. `release.yml` bricht ab, wenn der Tag nicht zur Version in `package.json` passt, führt Typecheck, Tests, Build und E2E aus, hängt dann `detailed-energy-card.js` an das Release (mit Build-Provenance-Attestation) und erzeugt die Release-Notes. Alle Actions sind auf Commit-SHAs gepinnt und die Jobs laufen mit minimalen Rechten. Optional folgt danach der PR zur Aufnahme in `hacs/default`.
+**Release-Ablauf:** Version in `package.json` erhöhen und `CHANGELOG.md` ergänzen, mergen, dann Tag `vX.Y.Z` pushen. `release.yml` bricht ab, wenn der Tag nicht zur Version in `package.json` passt, führt Typecheck, Tests, Build und E2E aus, hängt dann `detailed-energy-card.js` an das Release (mit Build-Provenance-Attestation) und erzeugt die Release-Notes. Alle Actions sind auf Commit-SHAs gepinnt und die Jobs laufen mit minimalen Rechten. HACS bietet das neue Release dann über den Standard-Store als Update an.
 
 ---
 
