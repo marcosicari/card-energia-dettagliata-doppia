@@ -140,6 +140,34 @@ rooms:
 
 In the visual editor they are under *Colors → Thresholds* (with a traffic-light preset, a level selector and a "scale limits" button that multiplies the limits of the shown list by a factor); an element's own thresholds are in its entry under *Own thresholds*. Every color field takes a single CSS color: hex (`#9184d9`), `rgb()`/`hsl()`, a named color (`orange`) or a theme variable (`var(--primary-color)`); anything else is a configuration error. Only `sensor.*` power entities (W / kW / MW) are supported; a sensor with another unit (for example kWh or V) is not counted as watts and shows a warning on its node. A battery state-of-charge sensor (`soc_entity`) must report `%`. All options are documented in the concept, section 3.
 
+## Several plants
+
+One card can show several separate plants, for example a house and an annex with their own solar, battery and consumers, plus one shared grid:
+
+```yaml
+type: custom:detailed-energy-card
+title: Plants
+sources:            # shared: appears in every plant
+  - { entity: sensor.grid, type: grid }
+options:
+  plants_layout: stack   # stack | row | tabs
+plants:
+  - name: House
+    home: { total_entity: sensor.house_total }
+    sources:
+      - { entity: sensor.pv_house, type: solar }
+      - { entity: sensor.battery_house, type: battery, soc_entity: sensor.battery_house_soc }
+    rooms:
+      - { area_id: kitchen, consumers: [{ entity: sensor.oven }] }
+  - name: Annex
+    sources:
+      - { entity: sensor.pv_annex, type: solar }
+    rooms:
+      - { area_id: garage, consumers: [{ entity: sensor.wallbox }] }
+```
+
+Put `home`, `floors` and `rooms` inside each plant, not on the top level. A consumer sensor may belong to one plant only. Limits: the shared grid is drawn in each plant, each plant has its own energy switch, and the visual editor cannot edit `plants` (YAML only).
+
 ## Development
 
 ```bash

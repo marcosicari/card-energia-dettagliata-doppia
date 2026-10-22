@@ -70,7 +70,8 @@ export const cardStyles = css`
     gap: 4px;
     margin: 0 0 8px;
   }
-  .modes button {
+  .modes button,
+  .plant-tabs button {
     background: none;
     border: 1px solid var(--_line);
     border-radius: 8px;
@@ -80,10 +81,50 @@ export const cardStyles = css`
     font-size: 0.85em;
     padding: 4px 12px;
   }
-  .modes button.on {
+  .modes button.on,
+  .plant-tabs button.on {
     background: color-mix(in srgb, var(--_accent) 25%, transparent);
     border-color: var(--_accent);
     color: var(--_text);
+  }
+  .plant-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0 0 12px;
+  }
+  /* several plants (options.plants_layout): the card of each plant sits inside the card around them */
+  .plants.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .plants.stack > * + * {
+    border-top: 1px solid var(--_line);
+    padding-top: 16px;
+  }
+  .plants.row {
+    align-items: start;
+    display: grid;
+    gap: 16px 24px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+  .plants > * {
+    min-width: 0;
+  }
+  :host([embedded]) ha-card {
+    --ha-card-background: transparent;
+    --ha-card-border-radius: 0;
+    --ha-card-border-width: 0;
+    --ha-card-box-shadow: none;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  :host([embedded]) h2 {
+    font-size: 1.05em;
   }
   .modes .status {
     color: var(--_muted);

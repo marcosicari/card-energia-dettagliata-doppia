@@ -1,5 +1,6 @@
 import { MAX_THRESHOLD_WIDTH, MIN_THRESHOLD_WIDTH, THRESHOLD_LEVELS, type LevelThresholds, type ThresholdConfig } from "./thresholds";
 import { isValidColor } from "./colors";
+import { plantConfig } from "./plants";
 
 export type SourceType = "solar" | "battery" | "grid" | "generic";
 
@@ -83,15 +84,35 @@ export interface OptionsConfig {
   mode?: "power" | "energy";
   /** periods the switch offers in the energy mode (default all) */
   energy_periods?: Array<"today" | "week" | "month">;
+  /** several plants: one below the other (default), side by side, or one at a time behind tabs */
+  plants_layout?: "stack" | "row" | "tabs";
+}
+
+/**
+ * One plant of a card with `plants`: a complete energy flow of its own. `sources` are the sources of this
+ * plant only (the shared ones of the card are added); `colors` and `options` are put over the shared ones.
+ */
+export interface PlantConfig {
+  /** shown as the title of the plant, and on its tab */
+  name: string;
+  home?: { total_entity?: string; total_energy_entity?: string };
+  sources?: SourceConfig[];
+  floors?: FloorConfig[];
+  rooms?: RoomConfig[];
+  colors?: ColorsConfig;
+  options?: OptionsConfig;
 }
 
 export interface EnergyCardConfig {
   type: string;
   title?: string;
   home?: { total_entity?: string; total_energy_entity?: string };
+  /** with `plants`: the sources shared by all plants (the grid, for example) */
   sources?: SourceConfig[];
   floors?: FloorConfig[];
   rooms?: RoomConfig[];
+  /** several separate plants in one card; `home`, `floors` and `rooms` then belong to each plant */
+  plants?: PlantConfig[];
   colors?: ColorsConfig;
   options?: OptionsConfig;
 }
@@ -141,6 +162,7 @@ function checkRoom(room: unknown, where: string): void {
 
 const UNITS = ["auto", "W", "kW"];
 const MODES = ["power", "energy"];
+export const PLANT_LAYOUTS = ["stack", "row", "tabs"] as const;
 export const ENERGY_PERIODS = ["today", "week", "month"] as const;
 export type EnergyPeriod = (typeof ENERGY_PERIODS)[number];
 /** Decimal places: Intl.NumberFormat accepts 0..20 everywhere; the editor offers 0..4. */
@@ -161,6 +183,9 @@ function checkOptions(options: unknown): void {
   }
   if (options.mode !== undefined && !MODES.includes(options.mode as string)) {
     throw new ConfigError(`options.mode: "${String(options.mode)}" must be one of ${MODES.join(", ")}`);
+  }
+  if (options.plants_layout !== undefined && !(PLANT_LAYOUTS as readonly unknown[]).includes(options.plants_layout)) {
+    throw new ConfigError(`options.plants_layout: "${String(options.plants_layout)}" must be one of ${PLANT_LAYOUTS.join(", ")}`);
   }
   list(options.energy_periods, "options.energy_periods").forEach((p, i) => {
     if (!(ENERGY_PERIODS as readonly unknown[]).includes(p)) {
@@ -209,9 +234,11 @@ function checkThresholds(value: unknown, path: string): void {
   });
 }
 
-/** A sensor (power or energy) may be assigned to one consumer slot only. */
-function checkUniqueConsumers(cfg: EnergyCardConfig): void {
-  const seen = new Map<string, string>();
+/**
+ * A sensor (power or energy) may be assigned to one consumer slot only. `seen` and `at` let the plants of
+ * one card share the check: a sensor used in two plants is reported like one used twice in a plant.
+ */
+function checkUniqueConsumers(cfg: EnergyCardConfig, seen = new Map<string, string>(), at = ""): void {
   const claim = (id: string, where: string) => {
     const first = seen.get(id);
     if (first) throw new ConfigError(`${where}: "${id}" is already assigned to ${first}; a sensor can be assigned only once`);
@@ -225,8 +252,8 @@ function checkUniqueConsumers(cfg: EnergyCardConfig): void {
         if (c.energy_entity) claim(c.energy_entity, `${where}.energy_entity`);
       }),
     );
-  scan(cfg.rooms, "rooms");
-  (cfg.floors ?? []).forEach((f, i) => scan(f.rooms, `floors[${i}].rooms`));
+  scan(cfg.rooms, `${at}rooms`);
+  (cfg.floors ?? []).forEach((f, i) => scan(f.rooms, `${at}floors[${i}].rooms`));
 }
 
 /** Validates a raw Lovelace config; throws ConfigError with a readable message. */
@@ -237,8 +264,15 @@ export function validateConfig(raw: unknown): EnergyCardConfig {
   const sources = list(raw.sources, "sources");
   const floors = list(raw.floors, "floors");
   const rooms = list(raw.rooms, "rooms");
+  const plants = list(raw.plants, "plants");
   if (floors.length && rooms.length) {
     throw new ConfigError("Use either `floors` or `rooms` on the top level, not both");
+  }
+  if (plants.length) {
+    // each plant has its own home and structure; the top level only holds what the plants share
+    if (floors.length || rooms.length || (raw.home !== undefined && raw.home !== null)) {
+      throw new ConfigError("With `plants`, put `home`, `floors` and `rooms` inside each plant, not on the top level");
+    }
   }
 
   if (raw.home !== undefined && raw.home !== null) {
@@ -275,7 +309,35 @@ export function validateConfig(raw: unknown): EnergyCardConfig {
 
   const cfg = raw as unknown as EnergyCardConfig;
   checkUniqueConsumers(cfg);
+  if (plants.length) checkPlants(cfg, plants);
   return cfg;
+}
+
+/**
+ * Every plant must be a valid single-plant config on its own (checked with its own sources, so that the
+ * messages point at `plants[i]`), and no consumer sensor may be used in two plants.
+ */
+function checkPlants(cfg: EnergyCardConfig, plants: unknown[]): void {
+  const seen = new Map<string, string>();
+  plants.forEach((p, i) => {
+    const at = `plants[${i}]`;
+    if (!isObj(p)) throw new ConfigError(`${at} must be a mapping`);
+    if (typeof p.name !== "string" || !p.name.trim()) throw new ConfigError(`${at}: a plant needs a name`);
+    if (p.plants !== undefined) throw new ConfigError(`${at}: plants cannot be nested`);
+    // the wrong shape must be a readable message here, not a TypeError while the plant is put together
+    for (const key of ["home", "options", "colors"]) {
+      if (p[key] !== undefined && p[key] !== null && !isObj(p[key])) throw new ConfigError(`${at}.${key} must be a mapping`);
+    }
+    if (p.sources !== undefined && p.sources !== null && !Array.isArray(p.sources)) throw new ConfigError(`${at}.sources must be a list`);
+    let own: EnergyCardConfig;
+    try {
+      own = validateConfig(plantConfig(cfg, i, true));
+    } catch (e) {
+      if (e instanceof ConfigError) throw new ConfigError(`${at} (${p.name}): ${e.message}`);
+      throw e;
+    }
+    checkUniqueConsumers(own, seen, `${at}.`);
+  });
 }
 
 /** All entity ids referenced by the config (used to limit re-renders). */

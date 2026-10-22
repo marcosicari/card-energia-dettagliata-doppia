@@ -14,7 +14,8 @@ import "./editor/card-editor";
 import { defineOnce, registerCardOnce } from "./register";
 import { RegistrySource, resolveNames, type AreaEntry, type FloorEntry } from "./model/registry";
 import { Tween, focusTargets, type Pos } from "./view/focus";
-import { parseSelection, removeLegacyKeysOnce, selectionKey, type Selection } from "./model/selection";
+import { parsePlantTab, parseSelection, plantTabKey, removeLegacyKeysOnce, selectionKey, type Selection } from "./model/selection";
+import { plantConfigs } from "./model/plants";
 import {
   computeLayout,
   curve,
@@ -78,6 +79,9 @@ export class DetailedEnergyCard extends LitElement {
   /** when the last answer arrived (ms); 0 = none for the current view */
   private _energyAt = 0;
   private _energyToken = 0;
+  /** with `plants`: the cards of the plants (each draws one plant), and the one open in the tabs layout */
+  private _plantEls: DetailedEnergyCard[] = [];
+  @state() private _plantTab = 0;
 
   private _hass?: Hass;
   private _entityIds: string[] = [];
@@ -116,12 +120,15 @@ export class DetailedEnergyCard extends LitElement {
       this._entityIds = collectEntityIds(this._config);
       this._thresholds = resolveThresholds(this._config.colors?.thresholds, this._config.colors?.level_thresholds);
       this._resolved = undefined;
+      // first, because with plants this card only arranges them: the energy mode and selection are theirs
+      this._syncPlants(this._config);
       this._sel = this._loadSelection();
       this._loadMode();
       this._ensureEnergy();
     } catch (e) {
       this._error = (e as Error).message;
       this._config = undefined;
+      this._plantEls = [];
     }
     this._recompute();
   }
@@ -129,6 +136,11 @@ export class DetailedEnergyCard extends LitElement {
   set hass(hass: Hass) {
     const old = this._hass;
     this._hass = hass;
+    if (this._plantEls.length) {
+      // every plant card looks by itself whether anything it shows has changed
+      for (const el of this._plantEls) el.hass = hass;
+      return;
+    }
     this._registries.ensure(hass);
     // Only re-render when a referenced entity or the floor / area registry changed.
     const registryChanged = !!old && (old.areas !== hass.areas || old.floors !== hass.floors);
@@ -144,7 +156,9 @@ export class DetailedEnergyCard extends LitElement {
   }
 
   getCardSize(): number {
-    return 8;
+    // plants one below the other are as tall as all of them together
+    const stacked = this._plantEls.length > 0 && (this._config?.options?.plants_layout ?? "stack") === "stack";
+    return stacked ? 8 * this._plantEls.length : 8;
   }
 
   getGridOptions() {
@@ -200,6 +214,10 @@ export class DetailedEnergyCard extends LitElement {
 
   private _recompute(): void {
     if (!this._config || !this._hass) return;
+    if (this._plantEls.length) {
+      this._model = undefined;
+      return;
+    }
     const states = this._hass.states;
     const reg = this._registries.get(this._hass);
     let cfg = this._config;
@@ -282,7 +300,7 @@ export class DetailedEnergyCard extends LitElement {
         /* storage may be unavailable or hold something else */
       }
     }
-    if (!cfg || !hasEnergy(cfg)) mode = "power";
+    if (!cfg || !hasEnergy(cfg) || this._plantEls.length) mode = "power";
     this._mode = mode;
     this._period = period;
     this._energy = undefined;
@@ -392,6 +410,63 @@ export class DetailedEnergyCard extends LitElement {
     `;
   }
 
+  // ---------- plants ----------
+
+  /**
+   * With `plants` this card only arranges the plants: every plant is an ordinary card of this same element,
+   * given the config of that plant (see model/plants.ts), so a plant behaves exactly like a card of its own.
+   * The cards are kept between configs, so an edit of the YAML does not throw their state away.
+   */
+  private _syncPlants(cfg: EnergyCardConfig): void {
+    this._plantEls = plantConfigs(cfg).map((plantCfg, i) => {
+      const el = this._plantEls[i] ?? (document.createElement("detailed-energy-card") as DetailedEnergyCard);
+      el.toggleAttribute("embedded", true);
+      el.setConfig(plantCfg);
+      if (this._hass) el.hass = this._hass;
+      return el;
+    });
+    this._plantTab = this._loadPlantTab(cfg, this._plantEls.length);
+  }
+
+  private _loadPlantTab(cfg: EnergyCardConfig, count: number): number {
+    if (cfg.options?.remember_selection === false) return 0;
+    try {
+      return parsePlantTab(localStorage.getItem(plantTabKey(cfg)), count);
+    } catch {
+      return 0;
+    }
+  }
+
+  private _selectPlant(index: number): void {
+    this._plantTab = index;
+    if (this._config?.options?.remember_selection === false) return;
+    try {
+      localStorage.setItem(plantTabKey(this._config), String(index));
+    } catch {
+      /* storage may be unavailable */
+    }
+  }
+
+  private _renderPlants(cfg: EnergyCardConfig): TemplateResult {
+    const layout = cfg.options?.plants_layout ?? "stack";
+    const tab = Math.min(this._plantTab, this._plantEls.length - 1);
+    // in the tabs layout only the open plant is in the page; the others are kept for when their tab is chosen
+    const shown = layout === "tabs" ? [this._plantEls[tab]] : this._plantEls;
+    return html`
+      <ha-card style=${colorVars(cfg.colors)}>
+        ${cfg.title ? html`<header><h2>${cfg.title}</h2></header>` : nothing}
+        ${layout === "tabs"
+          ? html`<div class="plant-tabs" role="tablist">
+              ${(cfg.plants ?? []).map(
+                (p, i) => html`<button role="tab" class=${i === tab ? "on" : ""} aria-selected=${i === tab} @click=${() => this._selectPlant(i)}>${p.name}</button>`,
+              )}
+            </div>`
+          : nothing}
+        <div class="plants ${layout}">${shown}</div>
+      </ha-card>
+    `;
+  }
+
   // ---------- helpers ----------
 
   private _t(key: Key): string {
@@ -493,6 +568,7 @@ export class DetailedEnergyCard extends LitElement {
   protected render(): TemplateResult {
     if (this._error) return html`<ha-card><div class="error">${this._error}</div></ha-card>`;
     const cfg = this._config;
+    if (cfg && this._plantEls.length) return this._renderPlants(cfg);
     const model = this._model;
     const frame = this._frame;
     if (!cfg || !model || !frame) return html`<ha-card></ha-card>`;

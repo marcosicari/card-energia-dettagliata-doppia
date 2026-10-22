@@ -286,6 +286,25 @@
         invalid: { title: "Ungültig", rooms: [{ name: "ohne area_id" }] },
       };
 
+      // Several plants in one card: the house (floors) and the flat (rooms) share one grid.
+      scenarios.plants = {
+        title: "Anlagen",
+        sources: [{ entity: "sensor.netz", type: "grid" }],
+        colors: { thresholds },
+        options: { unit: "kW" },
+        plants: [
+          {
+            name: "Haus",
+            home: scenarios.floors.home,
+            sources: sources.filter((src) => src.type !== "grid"),
+            floors: scenarios.floors.floors,
+          },
+          { name: "Wohnung", home: scenarios.flat.home, sources: [scenarios.flat.sources[0]], rooms: scenarios.flat.rooms },
+        ],
+      };
+      scenarios.plantsRow = { ...scenarios.plants, options: { unit: "kW", plants_layout: "row" } };
+      scenarios.plantsTabs = { ...scenarios.plants, options: { unit: "kW", plants_layout: "tabs" } };
+
       // Own limits per level, and the oven with its own list (green until 1 kW instead of orange from 300 W).
       scenarios.thresholds = {
         ...scenarios.floors,

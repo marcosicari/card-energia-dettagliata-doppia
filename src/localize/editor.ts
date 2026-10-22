@@ -113,6 +113,8 @@ const de = {
   warn_sum_conflict:
     "Die Räume verbrauchen zusammen {0} W, mehr als der Gesamt-Sensor ({1} W). „Nicht erfasst“ wird nicht angezeigt.",
   warn_low_contrast: "Geringer Kontrast zwischen Text und Hintergrund ({0} : 1, empfohlen ab 4.5 : 1)",
+  info_plants_yaml:
+    "Diese Karte zeigt mehrere Anlagen (plants). Der visuelle Editor kann sie noch nicht bearbeiten: bitte im Code-Editor (YAML) ändern.",
   err_not_sensor: "Nur sensor.* ist erlaubt",
   err_entity_not_found: "Entität nicht gefunden",
   err_not_power: "Kein Leistungssensor (device_class: power)",
@@ -230,6 +232,8 @@ const en: typeof de = {
   warn_sum_conflict:
     "The rooms use {0} W together, more than the total sensor ({1} W). \"Unassigned\" is not shown.",
   warn_low_contrast: "Low contrast between text and background ({0} : 1, 4.5 : 1 recommended)",
+  info_plants_yaml:
+    "This card shows several plants (plants). The visual editor cannot edit them yet: please change them in the code editor (YAML).",
   err_not_sensor: "Only sensor.* is allowed",
   err_entity_not_found: "Entity not found",
   err_not_power: "Not a power sensor (device_class: power)",

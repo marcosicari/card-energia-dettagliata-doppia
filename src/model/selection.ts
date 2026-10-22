@@ -24,6 +24,21 @@ export function selectionKey(cfg: EnergyCardConfig | undefined): string {
   return `${KEY_PREFIX}${encodeURIComponent(cfg?.options?.storage_id ?? "")}:${JSON.stringify(ids)}`;
 }
 
+/**
+ * Storage key of the plant that is open in the tabs layout. Built from the names of the plants, so another
+ * set of plants starts at the first tab; it lies under the `sel2:` prefix, which the cleanup of old keys keeps.
+ */
+export function plantTabKey(cfg: EnergyCardConfig | undefined): string {
+  const names = (cfg?.plants ?? []).map((p) => p.name);
+  return `${KEY_PREFIX}plants:${encodeURIComponent(cfg?.options?.storage_id ?? "")}:${JSON.stringify(names)}`;
+}
+
+/** The remembered tab as an index into `count` plants; anything else (missing, old, out of range) is the first. */
+export function parsePlantTab(raw: string | null, count: number): number {
+  const n = raw === null ? Number.NaN : Number(raw);
+  return Number.isInteger(n) && n >= 0 && n < count ? n : 0;
+}
+
 const idOrNull = (v: unknown): string | null | undefined =>
   v === null ? null : typeof v === "string" ? v : undefined;
 

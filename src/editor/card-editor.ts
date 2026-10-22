@@ -791,6 +791,8 @@ export class DetailedEnergyCardEditor extends LitElement {
 
   protected render(): TemplateResult {
     if (!this._config) return html``;
+    // each plant has its own structure; the forms below edit one: leave the YAML alone instead of rewriting it
+    if (this._config.plants?.length) return html`<div class="warn">${this._tr("info_plants_yaml")}</div>`;
     const dups = findDuplicates(this._config);
     const theme = getComputedStyle(this);
     const contrast = contrastWarning(
