@@ -103,11 +103,19 @@ export const cardStyles = css`
     border-top: 1px solid var(--_line);
     padding-top: 16px;
   }
+  /* side by side at every width: the plants share the width equally, with a line between them */
   .plants.row {
     align-items: start;
-    display: grid;
-    gap: 16px 24px;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+  }
+  .plants.row > * {
+    flex: 1 1 0;
+  }
+  .plants.row > * + * {
+    border-left: 1px solid var(--_line);
+    padding-left: 12px;
   }
   .plants > * {
     min-width: 0;
