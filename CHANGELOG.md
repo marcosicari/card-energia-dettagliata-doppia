@@ -5,6 +5,7 @@
 ### Added
 
 - Several plants in one card: `plants` lists complete plants (own `home`, `sources`, `floors` or `rooms`). Top-level `sources` (typically the grid), `colors` and `options` are shared by all plants. `options.plants_layout` is `stack` (default), `row` or `tabs`. The visual editor shows a notice for such cards; edit them in YAML.
+- `options.active_min_watts`: with `only_active_consumers`, a consumer is listed from this power on (default 1 W).
 
 ## 1.1.1
 

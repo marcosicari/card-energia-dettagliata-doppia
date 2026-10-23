@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigError, validateConfig } from "../src/model/config";
 import type { EnergyCardConfig } from "../src/model/config";
+import { listedConsumers } from "../src/model/compute";
 import { mergeColors, plantConfig, plantConfigs, plantStorageId } from "../src/model/plants";
 import { parsePlantTab, plantTabKey } from "../src/model/selection";
 
@@ -130,5 +131,19 @@ describe("plant tab selection", () => {
     const b = { ...base, plants: [{ name: "A" }, { name: "C" }] } as unknown as EnergyCardConfig;
     expect(plantTabKey(a)).not.toBe(plantTabKey(b));
     expect(plantTabKey(a)).toContain("sel2:");
+  });
+});
+
+describe("active_min_watts", () => {
+  it("validates the option", () => {
+    for (const bad of [-1, "30", Number.NaN]) rejects({ options: { active_min_watts: bad } }, /active_min_watts/);
+    expect(() => validateConfig({ ...base, options: { only_active_consumers: true, active_min_watts: 30 } })).not.toThrow();
+  });
+  it("lists only consumers from the threshold on, unreadable ones stay as warnings", () => {
+    const c = (watts: number, valid = true) => ({ entity: `sensor.w${watts}`, watts, valid }) as any;
+    const all = [c(5), c(29.9), c(30), c(100), c(0, false)];
+    expect(listedConsumers(all, true, 30).map((x) => x.watts)).toEqual([30, 100, 0]);
+    expect(listedConsumers(all, true).map((x) => x.watts)).toEqual([5, 29.9, 30, 100, 0]);
+    expect(listedConsumers(all, false, 30)).toHaveLength(5);
   });
 });

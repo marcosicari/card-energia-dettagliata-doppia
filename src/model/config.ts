@@ -74,6 +74,8 @@ export interface OptionsConfig {
   show_consumers?: boolean;
   /** list only consumers that draw power (1 W or more); sensors that cannot be read stay listed as warnings */
   only_active_consumers?: boolean;
+  /** with `only_active_consumers`: a consumer is listed from this power on, in watts (default 1) */
+  active_min_watts?: number;
   remember_selection?: boolean;
   /** tells cards with the same floors and rooms apart in the remembered selection (default: none) */
   storage_id?: string;
@@ -195,6 +197,10 @@ function checkOptions(options: unknown): void {
   const id = options.storage_id;
   if (id !== undefined && (typeof id !== "string" || !id || id.length > MAX_STORAGE_ID)) {
     throw new ConfigError(`options.storage_id must be text of 1 to ${MAX_STORAGE_ID} characters`);
+  }
+  const minW = options.active_min_watts;
+  if (minW !== undefined && (typeof minW !== "number" || !Number.isFinite(minW) || minW < 0)) {
+    throw new ConfigError("options.active_min_watts must be a number of 0 or more (watts)");
   }
   for (const key of ["animation", "show_unassigned", "show_consumers", "only_active_consumers", "remember_selection", "wrap_rooms", "focus_selected"]) {
     checkBool(options[key], `options.${key}`);

@@ -19,8 +19,11 @@ export interface ConsumerNode {
   thresholds?: ThresholdConfig[];
 }
 /** Consumers the list shows: with `onlyActive` the ones at rest (under 1 W) are left out, unreadable sensors stay as warnings. */
-export function listedConsumers(consumers: ConsumerNode[], onlyActive: boolean): ConsumerNode[] {
-  return onlyActive ? consumers.filter((c) => !c.valid || !isIdle(c.watts)) : consumers;
+export function listedConsumers(consumers: ConsumerNode[], onlyActive: boolean, minWatts?: number): ConsumerNode[] {
+  if (!onlyActive) return consumers;
+  // `minWatts` raises the bar for "active" above the 1 W of idle (say 30 W: smaller loads stay hidden)
+  const active = (w: number): boolean => (minWatts !== undefined ? Math.abs(w) >= minWatts : !isIdle(w));
+  return consumers.filter((c) => !c.valid || active(c.watts));
 }
 
 export interface RoomNode {

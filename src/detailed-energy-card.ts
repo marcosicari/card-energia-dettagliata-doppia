@@ -758,7 +758,7 @@ export class DetailedEnergyCard extends LitElement {
       return html`<div class="detail empty">${this._t("no_rooms")}</div>`;
     }
     const onlyActive = this._config?.options?.only_active_consumers === true;
-    const sorted = [...listedConsumers(room.consumers, onlyActive)].sort((a, b) => b.watts - a.watts);
+    const sorted = [...listedConsumers(room.consumers, onlyActive, this._config?.options?.active_min_watts)].sort((a, b) => b.watts - a.watts);
     const max = Math.max(1, ...sorted.map((c) => c.watts));
     const showUnassigned = this._config?.options?.show_unassigned !== false && model.unassigned >= 1;
     const thresholds = this._thresholds;
