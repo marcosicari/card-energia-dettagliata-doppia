@@ -20,6 +20,7 @@ import {
   computeLayout,
   curve,
   roomPath,
+  fitScale,
   flowDuration,
   strokeWidth,
   FLOOR_H,
@@ -513,6 +514,7 @@ export class DetailedEnergyCard extends LitElement {
       floors: model.floors.length,
       rooms: sel.rooms.length,
       wrap: cfg?.options?.wrap_rooms === true,
+      fit: cfg?.options?.fit_width === true,
     });
     // Positions of the floors and rooms. With options.focus_selected the selected element of a level
     // slides to the middle under its parent and the rest of that level fades out behind it.
@@ -615,7 +617,7 @@ export class DetailedEnergyCard extends LitElement {
         </header>
         ${this._renderModeSwitch(cfg)}
         <div class="scroll">
-          <div class="graph" style=${styleMap({ width: `${layout.width}px`, height: `${layout.height}px` })}>
+          <div class="graph" style=${styleMap({ width: `${layout.width}px`, height: `${layout.height}px`, "--k": String(cfg.options?.fit_width === true ? fitScale(layout.width, Math.max(model.sources.length, sel.rooms.length, model.floors.length)) : 1) })}>
             ${this._renderLines(model, layout, floorViews, roomViews, sel.floor, sel.room, allRooms, allFloors)}
             ${model.sources.map((s, i) => this._renderSource(s, layout.sourceXs[i]))}
             ${this._renderHome(model, layout, home, allFloors || (!model.floors.length && allRooms))}

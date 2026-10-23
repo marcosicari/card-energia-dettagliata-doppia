@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ConfigError, validateConfig } from "../src/model/config";
 import type { EnergyCardConfig } from "../src/model/config";
 import { listedConsumers } from "../src/model/compute";
+import { FIT_MIN_SCALE, computeLayout, fitScale } from "../src/view/layout";
 import { mergeColors, plantConfig, plantConfigs, plantStorageId } from "../src/model/plants";
 import { parsePlantTab, plantTabKey } from "../src/model/selection";
 
@@ -145,5 +146,21 @@ describe("active_min_watts", () => {
     expect(listedConsumers(all, true, 30).map((x) => x.watts)).toEqual([30, 100, 0]);
     expect(listedConsumers(all, true).map((x) => x.watts)).toEqual([5, 29.9, 30, 100, 0]);
     expect(listedConsumers(all, false, 30)).toHaveLength(5);
+  });
+});
+
+describe("fit_width", () => {
+  it("validates the option", () => {
+    rejects({ options: { fit_width: "yes" } }, /fit_width/);
+    expect(() => validateConfig({ ...base, options: { fit_width: true } })).not.toThrow();
+  });
+  it("never makes the diagram wider than the card", () => {
+    expect(computeLayout({ width: 230, sources: 3, floors: 0, rooms: 6 }).width).toBeGreaterThan(230);
+    expect(computeLayout({ width: 230, sources: 3, floors: 0, rooms: 6, fit: true }).width).toBe(230);
+  });
+  it("scales circles down to a floor and keeps full size when there is room", () => {
+    expect(fitScale(640, 5)).toBe(1);
+    expect(fitScale(230, 5)).toBeCloseTo(230 / 320);
+    expect(fitScale(100, 10)).toBe(FIT_MIN_SCALE);
   });
 });

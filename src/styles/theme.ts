@@ -224,12 +224,14 @@ export const cardStyles = css`
     --c: var(--node-color, var(--_accent));
     display: grid;
     place-items: center;
-    width: 54px;
-    height: 54px;
+    width: calc(54px * var(--k, 1));
+    height: calc(54px * var(--k, 1));
+    /* keeps the node as tall as at full size, so the lines still start at its bottom edge */
+    margin-bottom: calc(54px * (1 - var(--k, 1)));
     border-radius: 50%;
     border: 1.5px solid var(--_line);
     background: var(--_ground);
-    --mdc-icon-size: 24px;
+    --mdc-icon-size: calc(24px * var(--k, 1));
   }
   .circle.selected,
   .circle.source {
@@ -239,8 +241,9 @@ export const cardStyles = css`
     box-shadow: 0 0 14px color-mix(in srgb, var(--c) 55%, transparent);
   }
   .circle.home {
-    width: 66px;
-    height: 66px;
+    width: calc(66px * var(--k, 1));
+    height: calc(66px * var(--k, 1));
+    margin-bottom: calc(66px * (1 - var(--k, 1)));
     border-color: var(--_accent);
     box-shadow: 0 0 18px color-mix(in srgb, var(--_accent) 40%, transparent);
     font-weight: 600;
@@ -248,9 +251,10 @@ export const cardStyles = css`
     align-content: center;
   }
   .circle.room {
-    width: 42px;
-    height: 42px;
-    --mdc-icon-size: 20px;
+    width: calc(42px * var(--k, 1));
+    height: calc(42px * var(--k, 1));
+    margin-bottom: 0;
+    --mdc-icon-size: calc(20px * var(--k, 1));
   }
   .pill {
     padding: 9px 20px;

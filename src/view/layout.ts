@@ -17,6 +17,17 @@ export interface LayoutInput {
   rooms: number;
   /** wrap many rooms into two rows instead of scrolling */
   wrap?: boolean;
+  /** never wider than the card: nodes get narrower (and smaller, see `fitScale`) instead of scrolling */
+  fit?: boolean;
+}
+
+/** Smallest size factor of the circles in fit mode. */
+export const FIT_MIN_SCALE = 0.6;
+
+/** Size factor of the circles when `fit` squeezes `n` nodes of a row into `width` (1 = full size). */
+export function fitScale(width: number, n: number): number {
+  if (n <= 0 || width <= 0) return 1;
+  return Math.min(1, Math.max(FIT_MIN_SCALE, width / (n * ROOM_COL_W)));
 }
 
 export interface Layout {
@@ -62,7 +73,7 @@ export function computeLayout(i: LayoutInput): Layout {
   // Rows keep a fixed minimum column width; too many rooms scroll horizontally.
   const wrapped = !!i.wrap && i.rooms > MAX_ROOMS_PER_ROW && i.rooms * ROOM_FIT_W > i.width;
   const perRow = wrapped ? wrapColumns(i.rooms) : i.rooms;
-  const width = Math.max(i.width, perRow * ROOM_COL_W);
+  const width = i.fit ? i.width : Math.max(i.width, perRow * ROOM_COL_W);
   const yHome = i.sources > 0 ? 124 : 0;
   // Without a room row the floors sit closer to the home, and nothing is cut off below them.
   const yFloor = yHome + (i.floors > 0 && i.rooms === 0 ? 88 : 102);

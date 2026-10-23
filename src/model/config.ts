@@ -76,6 +76,8 @@ export interface OptionsConfig {
   only_active_consumers?: boolean;
   /** with `only_active_consumers`: a consumer is listed from this power on, in watts (default 1) */
   active_min_watts?: number;
+  /** never scroll sideways: with many rooms the circles get smaller instead (default false) */
+  fit_width?: boolean;
   remember_selection?: boolean;
   /** tells cards with the same floors and rooms apart in the remembered selection (default: none) */
   storage_id?: string;
@@ -202,7 +204,7 @@ function checkOptions(options: unknown): void {
   if (minW !== undefined && (typeof minW !== "number" || !Number.isFinite(minW) || minW < 0)) {
     throw new ConfigError("options.active_min_watts must be a number of 0 or more (watts)");
   }
-  for (const key of ["animation", "show_unassigned", "show_consumers", "only_active_consumers", "remember_selection", "wrap_rooms", "focus_selected"]) {
+  for (const key of ["animation", "show_unassigned", "show_consumers", "only_active_consumers", "remember_selection", "wrap_rooms", "focus_selected", "fit_width"]) {
     checkBool(options[key], `options.${key}`);
   }
 }
